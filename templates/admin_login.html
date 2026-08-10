@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Sızır Alabalık — Yönetici Girişi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-white d-flex align-items-center justify-content-center vh-100">
+    <div class="card bg-secondary text-white p-4 style="max-width:350px; width:100%;">
+        <h4 class="text-center fw-bold mb-3">🛡️ Yönetici Girişi</h4>
+        <input type="text" id="admin-user" class="form-control mb-2" placeholder="Kullanıcı Adı">
+        <input type="password" id="admin-pass" class="form-control mb-3" placeholder="Şifre">
+        <button class="btn btn-warning w-100 fw-bold" onclick="loginAdmin()">Giriş Yap</button>
+    </div>
+<script>
+    function loginAdmin() {
+        fetch('/api/admin-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                username: document.getElementById('admin-user').value, 
+                password: document.getElementById('admin-pass').value 
+            })
+        }).then(res => res.json()).then(data => {
+            if(data.status === 'success') location.reload();
+            else alert("Hatalı Giriş!");
+        });
+    }
+</script>
+</body>
+</html>
