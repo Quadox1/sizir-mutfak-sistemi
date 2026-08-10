@@ -10,7 +10,6 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sizir_alabalik_secret_key_2026'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# TELEGRAM BOT BİLGİLERİ (İsteğe Bağlı)
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 
@@ -25,6 +24,14 @@ MENU_ITEMS = [
     "Kiremitte Balık",
     "Kaşarlı Balık"
 ]
+
+# 🔐 GARSON HESAPLARI VE ŞİFRELERİ (Kullanıcı Adı : Şifre)
+GARSON_HESAPLARI = {
+    "ahmet": {"name": "Ahmet", "pass": "1234"},
+    "mehmet": {"name": "Mehmet", "pass": "1234"},
+    "can": {"name": "Can", "pass": "1234"},
+    "unal": {"name": "Ünal", "pass": "1234"}
+}
 
 def send_telegram_notification(message):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
@@ -46,6 +53,24 @@ def index():
 @app.route('/mutfak')
 def mutfak():
     return render_template('mutfak.html')
+
+# 🔑 GARSON HESAP GİRİŞİ API
+@app.route('/api/login', methods=['POST'])
+def garson_login():
+    data = request.json
+    username = data.get('username', '').strip().lower()
+    password = data.get('password', '').strip()
+
+    if username in GARSON_HESAPLARI and GARSON_HESAPLARI[username]['pass'] == password:
+        return jsonify({
+            "status": "success", 
+            "garson_name": GARSON_HESAPLARI[username]['name']
+        })
+    else:
+        return jsonify({
+            "status": "error", 
+            "message": "Kullanıcı adı veya şifre hatalı!"
+        }), 401
 
 @app.route('/api/siparis-ver', methods=['POST'])
 def siparis_ver():
