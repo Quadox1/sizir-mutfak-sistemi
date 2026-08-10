@@ -2,40 +2,124 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sızır Alabalık — Yönetici Paneli</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #12121e; color: #ffffff; font-family: 'Segoe UI', sans-serif; }
+        .card-dark { background-color: #1e1e2e; border: 1px solid #313244; border-radius: 12px; }
+        .text-accent { color: #89b4fa; }
+        .stat-card { background-color: #2a2a3c; border-radius: 10px; padding: 15px; border: 1px solid #45475a; }
+    </style>
 </head>
-<body class="bg-dark text-white p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>🛡️ Sızır Alabalık Yönetim Paneli</h2>
-        <button class="btn btn-outline-danger" onclick="logoutAdmin()">Çıkış Yap</button>
+<body class="p-3 p-md-4">
+
+<div class="container-fluid">
+    <!-- Üst Başlık -->
+    <div class="d-flex justify-content-between align-items-center mb-4 card-dark p-3">
+        <div>
+            <h3 class="text-warning fw-bold m-0">🛡️ Sızır Alabalık Yönetim Paneli</h3>
+            <span class="text-secondary small">Sistem, Garson ve Satış Raporlama Yönetimi</span>
+        </div>
+        <button class="btn btn-outline-danger fw-bold" onclick="logoutAdmin()">Çıkış Yap</button>
     </div>
 
-    <!-- Garson Hesap Yönetimi -->
-    <div class="card bg-secondary text-white p-3 mb-4">
-        <h4 class="mb-3">👤 Garson Hesaplarını Yönet</h4>
-        <div class="row g-2 mb-3">
-            <div class="col"><input type="text" id="new-u" class="form-control" placeholder="Kullanıcı Adı"></div>
-            <div class="col"><input type="text" id="new-n" class="form-control" placeholder="Garson İsmi"></div>
-            <div class="col"><input type="text" id="new-p" class="form-control" placeholder="Şifre"></div>
-            <div class="col"><button class="btn btn-success w-100" onclick="saveUser()">Ekle / Güncelle</button></div>
+    <!-- 📊 SATIŞ RAPORLARI (TOPLAM NE KADAR SATILDI?) -->
+    <div class="card card-dark p-3 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="text-accent fw-bold m-0">📊 Toplam Satış Raporları</h5>
+            <button class="btn btn-sm btn-outline-warning" onclick="loadReports()">🔄 Raporları Yenile</button>
         </div>
-        <table class="table table-dark table-striped">
-            <thead>
-                <tr><th>Kullanıcı Adı</th><th>Görünür İsim</th><th>Şifre</th><th>İşlem</th></tr>
-            </thead>
-            <tbody id="user-table"></tbody>
-        </table>
+
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-md-4">
+                <div class="stat-card text-center">
+                    <span class="text-secondary d-block small">Toplam Girilen Sipariş</span>
+                    <h2 class="text-warning fw-bold m-0" id="rep-total-orders">0</h2>
+                </div>
+            </div>
+        </div>
+
+        <h6 class="text-warning fw-bold mb-2">🍽️ Hangi Üründen Kaç Adet Satıldı?</h6>
+        <div class="row g-2 mb-4" id="rep-products-container">
+            <!-- Ürün satış adetleri düşecek -->
+        </div>
+
+        <h6 class="text-info fw-bold mb-2">👤 Garsonların Toplam Sipariş Adetleri</h6>
+        <div class="row g-2" id="rep-garson-container">
+            <!-- Garson sipariş sayıları düşecek -->
+        </div>
     </div>
+
+    <!-- 👤 GARSON HESAPLARI YÖNETİMİ -->
+    <div class="card card-dark p-3 mb-4">
+        <h5 class="text-accent fw-bold mb-3">👤 Garson Hesapları (Şifre & Kullanıcı Düzenleme)</h5>
+        
+        <div class="row g-2 mb-3">
+            <div class="col-12 col-md-3">
+                <input type="text" id="new-u" class="form-control bg-dark text-white border-secondary" placeholder="Kullanıcı Adı (Örn: ahmet)">
+            </div>
+            <div class="col-12 col-md-3">
+                <input type="text" id="new-n" class="form-control bg-dark text-white border-secondary" placeholder="Görünür İsim (Örn: Ahmet)">
+            </div>
+            <div class="col-12 col-md-3">
+                <input type="text" id="new-p" class="form-control bg-dark text-white border-secondary" placeholder="Şifre">
+            </div>
+            <div class="col-12 col-md-3">
+                <button class="btn btn-success w-100 fw-bold" onclick="saveUser()">➕ Garson Ekle / Güncelle</button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-dark table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Kullanıcı Adı</th>
+                        <th>Görünür İsim</th>
+                        <th>Şifre</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody id="user-table"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 🔐 ADMIN ŞİFRESİ DEĞİŞTİRME & SIFIRLAMA -->
+    <div class="row g-3">
+        <div class="col-12 col-md-6">
+            <div class="card card-dark p-3">
+                <h5 class="text-warning fw-bold mb-3">🔑 Yönetici (Admin) Şifresini Değiştir</h5>
+                <div class="input-group mb-2">
+                    <input type="password" id="admin-new-pass" class="form-control bg-dark text-white border-secondary" placeholder="Yeni Admin Şifresi">
+                    <button class="btn btn-warning fw-bold" onclick="updateAdminPass()">Güncelle</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6">
+            <div class="card card-dark p-3 border-danger">
+                <h5 class="text-danger fw-bold mb-2">⚠️ Gün Sonu Veri Temizliği</h5>
+                <p class="text-secondary small mb-2">Tüm geçmiş sipariş kayıtlarını siler ve sayaçları sıfırlar.</p>
+                <button class="btn btn-outline-danger fw-bold" onclick="clearAllOrders()">🗑️ Tüm Sipariş Geçmişini Sil</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        loadUsers();
+        loadReports();
+    });
+
     function loadUsers() {
         fetch('/api/admin/users').then(res => res.json()).then(users => {
             document.getElementById('user-table').innerHTML = users.map(u => `
                 <tr>
-                    <td>${u.username}</td>
+                    <td><strong class="text-accent">${u.username}</strong></td>
                     <td>${u.name}</td>
-                    <td>${u.password}</td>
+                    <td><code>${u.password}</code></td>
                     <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">Sil</button></td>
                 </tr>
             `).join('');
@@ -43,14 +127,16 @@
     }
 
     function saveUser() {
+        const u = document.getElementById('new-u').value.trim();
+        const n = document.getElementById('new-n').value.trim();
+        const p = document.getElementById('new-p').value.trim();
+
+        if(!u || !n || !p) return alert("Lütfen tüm alanları doldurun!");
+
         fetch('/api/admin/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                username: document.getElementById('new-u').value,
-                name: document.getElementById('new-n').value,
-                password: document.getElementById('new-p').value
-            })
+            body: JSON.stringify({ username: u, name: n, password: p })
         }).then(() => {
             loadUsers();
             document.getElementById('new-u').value = '';
@@ -60,18 +146,79 @@
     }
 
     function deleteUser(id) {
-        fetch('/api/admin/users', {
-            method: 'DELETE',
+        if(confirm("Bu garson hesabını silmek istediğinize emin misiniz?")) {
+            fetch('/api/admin/users', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id })
+            }).then(() => loadUsers());
+        }
+    }
+
+    function loadReports() {
+        fetch('/api/admin/reports').then(res => res.json()).then(data => {
+            document.getElementById('rep-total-orders').innerText = data.total_orders;
+
+            const pContainer = document.getElementById('rep-products-container');
+            const pEntries = Object.entries(data.product_stats);
+            if(pEntries.length === 0) {
+                pContainer.innerHTML = '<div class="col-12 text-secondary small">Henüz satış verisi bulunmuyor.</div>';
+            } else {
+                pContainer.innerHTML = pEntries.map(([name, qty]) => `
+                    <div class="col-6 col-md-4 col-lg-2">
+                        <div class="stat-card">
+                            <span class="text-white fw-bold d-block text-truncate">${name}</span>
+                            <span class="fs-4 fw-bold text-warning">${qty} Adet</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            const gContainer = document.getElementById('rep-garson-container');
+            const gEntries = Object.entries(data.garson_stats);
+            if(gEntries.length === 0) {
+                gContainer.innerHTML = '<div class="col-12 text-secondary small">Henüz garson verisi bulunmuyor.</div>';
+            } else {
+                gContainer.innerHTML = gEntries.map(([name, count]) => `
+                    <div class="col-6 col-md-3">
+                        <div class="stat-card">
+                            <span class="text-info fw-bold d-block">${name}</span>
+                            <span class="fs-5 text-light">${count} Sipariş</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        });
+    }
+
+    function updateAdminPass() {
+        const p = document.getElementById('admin-new-pass').value.trim();
+        if(!p) return alert("Lütfen yeni şifreyi girin!");
+
+        fetch('/api/admin/change-pass', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id })
-        }).then(() => loadUsers());
+            body: JSON.stringify({ password: p })
+        }).then(res => res.json()).then(data => {
+            if(data.status === 'success') {
+                alert("Yönetici şifresi başarıyla değiştirildi!");
+                document.getElementById('admin-new-pass').value = '';
+            }
+        });
+    }
+
+    function clearAllOrders() {
+        if(confirm("Tüm geçmiş sipariş kayıtları silinecek. Emin misiniz?")) {
+            fetch('/api/admin/clear-orders', { method: 'POST' }).then(() => {
+                loadReports();
+                alert("Sipariş verileri temizlendi!");
+            });
+        }
     }
 
     function logoutAdmin() {
         fetch('/api/admin-logout', { method: 'POST' }).then(() => location.reload());
     }
-
-    loadUsers();
 </script>
 </body>
 </html>
