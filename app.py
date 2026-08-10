@@ -130,8 +130,11 @@ def siparis_ver():
     order_id = str(int(last_order['order_id']) + 1) if last_order else "101"
     now_str = datetime.now().strftime("%H:%M")
 
+    # Ürünleri standart menü sırasına göre sırala
+    sorted_items = sorted(items, key=lambda x: MENU_ITEMS.index(x['name']) if x['name'] in MENU_ITEMS else 99)
+
     order_items = []
-    for item in items:
+    for item in sorted_items:
         order_items.append({
             "id": f"{order_id}_{len(order_items)}",
             "name": item['name'],
@@ -165,11 +168,18 @@ def item_durum_degistir():
     row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
     if row:
         items = json.loads(row['items_json'])
+        all_ready = True
         for item in items:
             if item['id'] == item_id:
                 item['status'] = "hazir" if item['status'] == "hazirlaniyor" else "hazirlaniyor"
+            if item['status'] != "hazir":
+                all_ready = False
 
-        conn.execute("UPDATE orders SET items_json = ? WHERE order_id = ?", (json.dumps(items), order_id))
+        # Eğer TÜM ÜRÜNLER tamamlandıysa siparişi otomatik olarak 'mutfak_tamam' durumuna geçir
+        new_status = "mutfak_tamam" if all_ready else "aktif"
+
+        conn.execute("UPDATE orders SET items_json = ?, status = ? WHERE order_id = ?", 
+                     (json.dumps(items), new_status, order_id))
         conn.commit()
 
         updated_order = {
@@ -177,7 +187,7 @@ def item_durum_degistir():
             "garson": row['garson'],
             "time": row['time_str'],
             "items": items,
-            "status": row['status']
+            "status": new_status
         }
         conn.close()
         socketio.emit('siparis_guncellendi', updated_order)
@@ -186,35 +196,9 @@ def item_durum_degistir():
     conn.close()
     return jsonify({"status": "error"}), 404
 
-# GARSON SİPARİŞİ TEZGAHTAN TESLİM ALDI
+# GARSON TESLİM ALDI -> OTOMATİK OLARAK TAMAMLANIR (KARARIR)
 @app.route('/api/garson-teslim-aldi', methods=['POST'])
 def garson_teslim_aldi():
-    data = request.get_json(silent=True) or {}
-    order_id = str(data.get('order_id'))
-    conn = get_db()
-    
-    row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
-    if row:
-        conn.execute("UPDATE orders SET status = 'garson_alindi' WHERE order_id = ?", (order_id,))
-        conn.commit()
-        
-        updated_order = {
-            "order_id": order_id,
-            "garson": row['garson'],
-            "time": row['time_str'],
-            "items": json.loads(row['items_json']),
-            "status": "garson_alindi"
-        }
-        conn.close()
-        socketio.emit('siparis_guncellendi', updated_order)
-        return jsonify({"status": "success"})
-
-    conn.close()
-    return jsonify({"status": "error"}), 404
-
-# MUTFAK SİPARİŞİ TAMAMLADI (KARARIR VE ALT SIRAYA GEÇER)
-@app.route('/api/mutfak-tamamla', methods=['POST'])
-def mutfak_tamamla():
     data = request.get_json(silent=True) or {}
     order_id = str(data.get('order_id'))
     conn = get_db()
@@ -238,17 +222,28 @@ def mutfak_tamamla():
     conn.close()
     return jsonify({"status": "error"}), 404
 
-# ↩️ GERİ ALMA API'Sİ (MUTFAK VEYA GARSON İÇİN)
+# MUTFAKTAN SİPARİŞİ SİLME API'Sİ
+@app.route('/api/siparis-sil', methods=['POST'])
+def siparis_sil():
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get('order_id'))
+    conn = get_db()
+    conn.execute("DELETE FROM orders WHERE order_id = ?", (order_id,))
+    conn.commit()
+    conn.close()
+
+    socketio.emit('siparis_silindi', {"order_id": order_id})
+    return jsonify({"status": "success"})
+
 @app.route('/api/siparis-geri-al', methods=['POST'])
 def siparis_geri_al():
     data = request.get_json(silent=True) or {}
     order_id = str(data.get('order_id'))
-    target_status = data.get('target_status', 'aktif')
     
     conn = get_db()
     row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
     if row:
-        conn.execute("UPDATE orders SET status = ? WHERE order_id = ?", (target_status, order_id))
+        conn.execute("UPDATE orders SET status = 'aktif' WHERE order_id = ?", (order_id,))
         conn.commit()
         
         updated_order = {
@@ -256,7 +251,7 @@ def siparis_geri_al():
             "garson": row['garson'],
             "time": row['time_str'],
             "items": json.loads(row['items_json']),
-            "status": target_status
+            "status": "aktif"
         }
         conn.close()
         socketio.emit('siparis_guncellendi', updated_order)
