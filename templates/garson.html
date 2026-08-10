@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sızır Alabalık — Garson Paneli</title>
+    <title>Sızır Alabalık — Garson Hesabı Girişi</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
@@ -18,12 +18,24 @@
 </head>
 <body class="pb-5 mb-5">
 
-<!-- GARSON GİRİŞ MODALI -->
+<!-- GARSON ŞİFRELİ HESAP GİRİŞ MODALI -->
 <div id="login-screen" class="position-fixed top-0 start-0 w-100 h-100 bg-dark d-flex align-items-center justify-content-center p-3" style="z-index: 2000;">
     <div class="card card-dark p-4 w-100" style="max-width: 380px;">
-        <h3 class="text-center text-accent fw-bold mb-3">🐟 Sızır Alabalık</h3>
-        <p class="text-secondary text-center small mb-3">Garson Paneline Giriş Yapın</p>
-        <input type="text" id="input-garson-name" class="form-control form-control-lg bg-dark text-white border-secondary mb-3" placeholder="İsminizi Girin (Örn: Ahmet)">
+        <h3 class="text-center text-accent fw-bold mb-2">🐟 Sızır Alabalık</h3>
+        <p class="text-secondary text-center small mb-4">Garson Hesabınızla Giriş Yapın</p>
+        
+        <div id="login-error" class="alert alert-danger py-2 small d-none text-center"></div>
+
+        <div class="mb-3">
+            <label class="form-label text-secondary small fw-bold">Kullanıcı Adı</label>
+            <input type="text" id="input-username" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="Örn: ahmet">
+        </div>
+
+        <div class="mb-4">
+            <label class="form-label text-secondary small fw-bold">Şifre</label>
+            <input type="password" id="input-password" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="••••">
+        </div>
+
         <button class="btn btn-primary btn-lg w-100 fw-bold" onclick="loginGarson()">Giriş Yap</button>
     </div>
 </div>
@@ -33,7 +45,7 @@
     <!-- Üst Başlık ve Garson Bilgisi -->
     <div class="d-flex justify-content-between align-items-center mb-3 card-dark p-3">
         <div>
-            <span class="text-secondary small d-block">Aktif Garson</span>
+            <span class="text-secondary small d-block">Aktif Garson Hesabı</span>
             <h4 class="text-warning fw-bold m-0" id="garson-title">---</h4>
         </div>
         <button class="btn btn-outline-danger btn-sm" onclick="logoutGarson()">Çıkış Yap</button>
@@ -42,9 +54,7 @@
     <!-- Garsonun Anlık İstatistik Paneli -->
     <div class="card card-dark p-3 mb-3">
         <h6 class="text-accent fw-bold mb-2">📊 Bugün Toplam Siparişiniz: <span id="stat-total-orders" class="text-warning fs-5">0</span></h6>
-        <div id="stat-items-breakdown" class="d-flex flex-wrap gap-2 mt-2">
-            <!-- Ürün adet kırılımları buraya düşecek -->
-        </div>
+        <div id="stat-items-breakdown" class="d-flex flex-wrap gap-2 mt-2"></div>
     </div>
 
     <!-- Menü Alanı -->
@@ -91,11 +101,33 @@
     }
 
     function loginGarson() {
-        const name = document.getElementById('input-garson-name').value.trim();
-        if (!name) return alert("Lütfen isminizi girin!");
-        activeGarson = name;
-        localStorage.setItem('sizir_garson_name', activeGarson);
-        initGarsonSession();
+        const username = document.getElementById('input-username').value.trim();
+        const password = document.getElementById('input-password').value.trim();
+        const errDiv = document.getElementById('login-error');
+
+        if (!username || !password) {
+            errDiv.innerText = "Lütfen kullanıcı adı ve şifrenizi girin!";
+            errDiv.classList.remove('d-none');
+            return;
+        }
+
+        fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username, password: password })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                errDiv.classList.add('d-none');
+                activeGarson = data.garson_name;
+                localStorage.setItem('sizir_garson_name', activeGarson);
+                initGarsonSession();
+            } else {
+                errDiv.innerText = data.message || "Giriş başarısız!";
+                errDiv.classList.remove('d-none');
+            }
+        });
     }
 
     function logoutGarson() {
@@ -143,7 +175,6 @@
         });
     }
 
-    // SOCKET DINLEMELERI (Sadece Garsonun Kendi Verileri)
     socket.on('tum_siparisler', (orders) => {
         myOrders = orders.filter(o => o.garson === activeGarson);
         renderMyOrders();
