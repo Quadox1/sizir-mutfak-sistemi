@@ -28,7 +28,7 @@
 
         <div class="mb-3">
             <label class="form-label text-secondary small fw-bold">Kullanıcı Adı</label>
-            <input type="text" id="input-username" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="Örn: ahmet">
+            <input type="text" id="input-username" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="Örn: ahmet" autocomplete="off">
         </div>
 
         <div class="mb-4">
@@ -36,7 +36,7 @@
             <input type="password" id="input-password" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="••••">
         </div>
 
-        <button class="btn btn-primary btn-lg w-100 fw-bold" onclick="loginGarson()">Giriş Yap</button>
+        <button type="button" id="btn-login-action" class="btn btn-primary btn-lg w-100 fw-bold" onclick="loginGarson()">Giriş Yap</button>
     </div>
 </div>
 
@@ -96,20 +96,34 @@
     let myOrders = [];
     const socket = io();
 
-    if (activeGarson) {
-        initGarsonSession();
-    }
+    document.addEventListener("DOMContentLoaded", function() {
+        if (activeGarson) {
+            initGarsonSession();
+        }
+
+        // Enter tuşuna basınca giriş yapmayı sağla
+        document.getElementById('input-password').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') loginGarson();
+        });
+    });
 
     function loginGarson() {
-        const username = document.getElementById('input-username').value.trim();
-        const password = document.getElementById('input-password').value.trim();
+        const usernameInput = document.getElementById('input-username');
+        const passwordInput = document.getElementById('input-password');
         const errDiv = document.getElementById('login-error');
+        const loginBtn = document.getElementById('btn-login-action');
+
+        const username = usernameInput ? usernameInput.value.trim() : "";
+        const password = passwordInput ? passwordInput.value.trim() : "";
 
         if (!username || !password) {
             errDiv.innerText = "Lütfen kullanıcı adı ve şifrenizi girin!";
             errDiv.classList.remove('d-none');
             return;
         }
+
+        loginBtn.disabled = true;
+        loginBtn.innerText = "Giriş Yapılıyor...";
 
         fetch('/api/login', {
             method: 'POST',
@@ -118,15 +132,24 @@
         })
         .then(res => res.json())
         .then(data => {
+            loginBtn.disabled = false;
+            loginBtn.innerText = "Giriş Yap";
+
             if (data.status === 'success') {
                 errDiv.classList.add('d-none');
                 activeGarson = data.garson_name;
                 localStorage.setItem('sizir_garson_name', activeGarson);
                 initGarsonSession();
             } else {
-                errDiv.innerText = data.message || "Giriş başarısız!";
+                errDiv.innerText = data.message || "Kullanıcı adı veya şifre hatalı!";
                 errDiv.classList.remove('d-none');
             }
+        })
+        .catch(err => {
+            loginBtn.disabled = false;
+            loginBtn.innerText = "Giriş Yap";
+            errDiv.innerText = "Bağlantı hatası oluştu! Lütfen tekrar deneyin.";
+            errDiv.classList.remove('d-none');
         });
     }
 
