@@ -1,0 +1,5 @@
+Flask==3.0.3
+Flask-SocketIO==5.3.6
+python-telegram-bot==21.1.1
+gunicorn==22.0.0
+eventlet==0.35.2
