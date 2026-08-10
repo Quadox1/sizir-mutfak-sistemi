@@ -26,55 +26,49 @@
         
         <div id="login-error" class="alert alert-danger py-2 small d-none text-center"></div>
 
-        <form onsubmit="event.preventDefault(); doLogin();">
-            <div class="mb-3">
-                <label class="form-label text-secondary small fw-bold">Kullanıcı Adı</label>
-                <input type="text" id="input-username" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="Örn: ahmet" required>
-            </div>
+        <div class="mb-3">
+            <label class="form-label text-secondary small fw-bold">Kullanıcı Adı</label>
+            <input type="text" id="input-username" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="Örn: ahmet" autocomplete="off">
+        </div>
 
-            <div class="mb-4">
-                <label class="form-label text-secondary small fw-bold">Şifre</label>
-                <input type="password" id="input-password" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="••••" required>
-            </div>
+        <div class="mb-4">
+            <label class="form-label text-secondary small fw-bold">Şifre</label>
+            <input type="password" id="input-password" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="••••">
+        </div>
 
-            <button type="submit" id="btn-login-action" class="btn btn-primary btn-lg w-100 fw-bold">Giriş Yap</button>
-        </form>
+        <button type="button" id="btn-login-action" class="btn btn-primary btn-lg w-100 fw-bold">Giriş Yap</button>
     </div>
 </div>
 
 <!-- ANA GARSON ARAYÜZÜ -->
 <div class="container py-3" id="app-content" style="display: none;">
-    <!-- Üst Başlık ve Garson Bilgisi -->
     <div class="d-flex justify-content-between align-items-center mb-3 card-dark p-3">
         <div>
             <span class="text-secondary small d-block">Aktif Garson Hesabı</span>
             <h4 class="text-warning fw-bold m-0" id="garson-title">---</h4>
         </div>
-        <button class="btn btn-outline-danger btn-sm" onclick="logoutGarson()">Çıkış Yap</button>
+        <button type="button" class="btn btn-outline-danger btn-sm" id="btn-logout">Çıkış Yap</button>
     </div>
 
-    <!-- Garsonun Anlık İstatistik Paneli -->
     <div class="card card-dark p-3 mb-3">
         <h6 class="text-accent fw-bold mb-2">📊 Bugün Toplam Siparişiniz: <span id="stat-total-orders" class="text-warning fs-5">0</span></h6>
         <div id="stat-items-breakdown" class="d-flex flex-wrap gap-2 mt-2"></div>
     </div>
 
-    <!-- Menü Alanı -->
     <div class="card card-dark p-3 mb-3">
         <h5 class="text-warning fw-bold mb-3">🍽️ Menü</h5>
         {% for item in menu %}
         <div class="item-row d-flex justify-content-between align-items-center">
             <span class="fw-bold fs-6 text-white">{{ item }}</span>
             <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-danger qty-btn p-0 d-flex align-items-center justify-content-center" onclick="updateQty('{{ item }}', -1)">-</button>
+                <button type="button" class="btn btn-danger qty-btn p-0 d-flex align-items-center justify-content-center" onclick="updateQty('{{ item }}', -1)">-</button>
                 <span id="qty-{{ item }}" class="fw-bold text-warning fs-5 px-2">0</span>
-                <button class="btn btn-success qty-btn p-0 d-flex align-items-center justify-content-center" onclick="updateQty('{{ item }}', 1)">+</button>
+                <button type="button" class="btn btn-success qty-btn p-0 d-flex align-items-center justify-content-center" onclick="updateQty('{{ item }}', 1)">+</button>
             </div>
         </div>
         {% endfor %}
     </div>
 
-    <!-- Garsonun Aktif Bekleyen Sipariş Takip Listesi -->
     <div class="card card-dark p-3 mb-5">
         <h5 class="text-info fw-bold mb-3">⏳ Mutfaktaki Siparişleriniz</h5>
         <div id="my-orders-list">
@@ -83,13 +77,12 @@
     </div>
 </div>
 
-<!-- Alt Sabit Sipariş Gönderme Barı -->
 <div class="basket-bar d-flex justify-content-between align-items-center" id="basket-bar" style="display: none !important;">
     <div>
         <span class="text-secondary small d-block">Toplam Seçilen</span>
         <span class="fw-bold text-white fs-5" id="lbl-total-items">0 Ürün</span>
     </div>
-    <button class="btn btn-success btn-lg px-4 fw-bold" id="btn-submit" onclick="submitOrder()" disabled>🚀 Mutfağa Gönder</button>
+    <button type="button" class="btn btn-success btn-lg px-4 fw-bold" id="btn-submit" onclick="submitOrder()" disabled>🚀 Mutfağa Gönder</button>
 </div>
 
 <script>
@@ -99,34 +92,46 @@
     const socket = io();
 
     document.addEventListener("DOMContentLoaded", function() {
+        // Buton dinleyicilerini güvenli şekilde bağla (Inline onclick engeline takılmaması için)
+        document.getElementById('btn-login-action').addEventListener('click', loginGarson);
+        document.getElementById('btn-logout').addEventListener('click', logoutGarson);
+
+        document.getElementById('input-password').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') loginGarson();
+        });
+
         if (activeGarson) {
             initGarsonSession();
         }
     });
 
-    async function doLogin() {
+    function loginGarson() {
         const usernameVal = document.getElementById('input-username').value.trim();
         const passwordVal = document.getElementById('input-password').value.trim();
         const errDiv = document.getElementById('login-error');
         const loginBtn = document.getElementById('btn-login-action');
 
-        errDiv.classList.add('d-none');
+        if (!usernameVal || !passwordVal) {
+            errDiv.innerText = "Lütfen kullanıcı adı ve şifrenizi girin!";
+            errDiv.classList.remove('d-none');
+            return;
+        }
+
         loginBtn.disabled = true;
-        loginBtn.innerText = "Kontrol Ediliyor...";
+        loginBtn.innerText = "Giriş Yapılıyor...";
 
-        try {
-            const response = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: usernameVal, password: passwordVal })
-            });
-
-            const data = await response.json();
-
+        fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: usernameVal, password: passwordVal })
+        })
+        .then(res => res.json())
+        .then(data => {
             loginBtn.disabled = false;
             loginBtn.innerText = "Giriş Yap";
 
-            if (response.ok && data.status === 'success') {
+            if (data.status === 'success') {
+                errDiv.classList.add('d-none');
                 activeGarson = data.garson_name;
                 localStorage.setItem('sizir_garson_name', activeGarson);
                 initGarsonSession();
@@ -134,12 +139,13 @@
                 errDiv.innerText = data.message || "Giriş Başarısız!";
                 errDiv.classList.remove('d-none');
             }
-        } catch (err) {
+        })
+        .catch(err => {
             loginBtn.disabled = false;
             loginBtn.innerText = "Giriş Yap";
-            errDiv.innerText = "Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.";
+            errDiv.innerText = "Sunucu hatası!";
             errDiv.classList.remove('d-none');
-        }
+        });
     }
 
     function logoutGarson() {
@@ -148,7 +154,7 @@
     }
 
     function initGarsonSession() {
-        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('login-screen').setAttribute('style', 'display: none !important');
         document.getElementById('app-content').style.display = 'block';
         document.getElementById('basket-bar').style.setProperty('display', 'flex', 'important');
         document.getElementById('garson-title').innerText = activeGarson;
