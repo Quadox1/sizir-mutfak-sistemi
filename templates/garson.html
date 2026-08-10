@@ -65,7 +65,12 @@
 
     <!-- Mutfaktaki Siparişleriniz -->
     <div class="card card-dark p-3 mb-5">
-        <h5 class="text-info fw-bold mb-3">⏳ Sipariş Takibi & Bildirimler</h5>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="text-info fw-bold m-0">⏳ Sipariş Takibi & Bildirimler</h5>
+            <button class="btn btn-outline-danger btn-sm fw-bold" onclick="clearGarsonScreen()">
+                🧹 Ekranı Temizle
+            </button>
+        </div>
         <div id="my-orders-list">
             <p class="text-secondary small">Henüz siparişiniz yok.</p>
         </div>
@@ -153,6 +158,11 @@
         });
     }
 
+    function clearGarsonScreen() {
+        myOrders = [];
+        renderMyOrders();
+    }
+
     socket.on('tum_siparisler', (orders) => {
         myOrders = orders.filter(o => o.garson === activeGarson);
         renderMyOrders();
@@ -203,7 +213,6 @@
 
         container.innerHTML = myOrders.map(o => {
             let isGarsonTook = (o.status === 'garson_alindi');
-            let isMutfakDone = (o.status === 'mutfak_tamam');
             let hasReadyItem = o.items.some(i => i.status === 'hazir');
 
             let itemsHtml = o.items.map(i => `
