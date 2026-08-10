@@ -3,68 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Garson Sipariş Girişi — Sızır Alabalık</title>
+    <title>Sızır Alabalık — Garson Paneli</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card-custom { background-color: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 12px; }
-        .btn-garson { border-radius: 20px; font-weight: bold; }
-        .qty-btn { width: 38px; height: 38px; font-weight: bold; border-radius: 50%; }
-        .basket-bar { position: fixed; bottom: 0; left: 0; right: 0; background-color: #1e1e1e; border-top: 2px solid #333; padding: 12px 20px; box-shadow: 0 -4px 10px rgba(0,0,0,0.5); }
+        body { background-color: #12121e; color: #ffffff; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        .card-dark { background-color: #1e1e2e; border: 1px solid #313244; border-radius: 12px; }
+        .text-accent { color: #89b4fa; }
+        .qty-btn { width: 44px; height: 44px; font-weight: bold; font-size: 1.3rem; border-radius: 8px; }
+        .basket-bar { position: fixed; bottom: 0; left: 0; right: 0; background-color: #181825; border-top: 2px solid #89b4fa; padding: 12px 16px; z-index: 1000; }
+        .item-row { background-color: #2a2a3c; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; border: 1px solid #45475a; }
+        .order-badge { background-color: #313244; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; }
     </style>
 </head>
 <body class="pb-5 mb-5">
 
-<div class="container py-3">
-    <!-- Garson Seçim Alanı -->
-    <div class="card card-custom p-3 mb-3">
-        <label class="form-label text-warning font-weight-bold fw-bold">👤 Garson Adı Seçin:</label>
-        <div class="d-flex flex-wrap gap-2" id="garson-buttons">
-            {% for g in garsonlar %}
-            <button class="btn btn-outline-warning btn-garson px-3 py-2" onclick="selectGarson('{{ g }}', this)">{{ g }}</button>
-            {% endfor %}
-        </div>
+<!-- GARSON GİRİŞ MODALI -->
+<div id="login-screen" class="position-fixed top-0 start-0 w-100 h-100 bg-dark d-flex align-items-center justify-content-center p-3" style="z-index: 2000;">
+    <div class="card card-dark p-4 w-100" style="max-width: 380px;">
+        <h3 class="text-center text-accent fw-bold mb-3">🐟 Sızır Alabalık</h3>
+        <p class="text-secondary text-center small mb-3">Garson Paneline Giriş Yapın</p>
+        <input type="text" id="input-garson-name" class="form-control form-control-lg bg-dark text-white border-secondary mb-3" placeholder="İsminizi Girin (Örn: Ahmet)">
+        <button class="btn btn-primary btn-lg w-100 fw-bold" onclick="loginGarson()">Giriş Yap</button>
     </div>
-
-    <!-- Menü Kategorileri ve Ürünler -->
-    {% for cat, items in menu.items() %}
-    <div class="card card-custom p-3 mb-3">
-        <h5 class="text-info fw-bold mb-3">{{ cat }}</h5>
-        <div class="row g-2">
-            {% for item in items %}
-            <div class="col-12 d-flex justify-content-between align-items-center bg-dark p-2 rounded border border-secondary">
-                <span class="fw-bold">{{ item }}</span>
-                <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-danger qty-btn p-0" onclick="updateQty('{{ item }}', -1)">-</button>
-                    <span id="qty-{{ item }}" class="fw-bold text-warning fs-5 px-1">0</span>
-                    <button class="btn btn-success qty-btn p-0" onclick="updateQty('{{ item }}', 1)">+</button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endfor %}
 </div>
 
-<!-- Alt Sipariş Onay Barı -->
-<div class="basket-bar d-flex justify-content-between align-items-center">
+<!-- ANA GARSON ARAYÜZÜ -->
+<div class="container py-3" id="app-content" style="display: none;">
+    <!-- Üst Başlık ve Garson Bilgisi -->
+    <div class="d-flex justify-content-between align-items-center mb-3 card-dark p-3">
+        <div>
+            <span class="text-secondary small d-block">Aktif Garson</span>
+            <h4 class="text-warning fw-bold m-0" id="garson-title">---</h4>
+        </div>
+        <button class="btn btn-outline-danger btn-sm" onclick="logoutGarson()">Çıkış Yap</button>
+    </div>
+
+    <!-- Garsonun Anlık İstatistik Paneli -->
+    <div class="card card-dark p-3 mb-3">
+        <h6 class="text-accent fw-bold mb-2">📊 Bugün Toplam Siparişiniz: <span id="stat-total-orders" class="text-warning fs-5">0</span></h6>
+        <div id="stat-items-breakdown" class="d-flex flex-wrap gap-2 mt-2">
+            <!-- Ürün adet kırılımları buraya düşecek -->
+        </div>
+    </div>
+
+    <!-- Menü Alanı -->
+    <div class="card card-dark p-3 mb-3">
+        <h5 class="text-warning fw-bold mb-3">🍽️ Menü</h5>
+        {% for item in menu %}
+        <div class="item-row d-flex justify-content-between align-items-center">
+            <span class="fw-bold fs-6 text-white">{{ item }}</span>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-danger qty-btn p-0 d-flex align-items-center justify-content-center" onclick="updateQty('{{ item }}', -1)">-</button>
+                <span id="qty-{{ item }}" class="fw-bold text-warning fs-5 px-2">0</span>
+                <button class="btn btn-success qty-btn p-0 d-flex align-items-center justify-content-center" onclick="updateQty('{{ item }}', 1)">+</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Garsonun Aktif Bekleyen Sipariş Takip Listesi -->
+    <div class="card card-dark p-3 mb-5">
+        <h5 class="text-info fw-bold mb-3">⏳ Mutfaktaki Siparişleriniz</h5>
+        <div id="my-orders-list">
+            <p class="text-secondary small">Henüz bekleyen siparişiniz yok.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Alt Sabit Sipariş Gönderme Barı -->
+<div class="basket-bar d-flex justify-content-between align-items-center" id="basket-bar" style="display: none !important;">
     <div>
-        <span class="text-secondary small d-block">Seçilen Garson: <strong id="lbl-garson" class="text-warning">Seçilmedi</strong></span>
+        <span class="text-secondary small d-block">Toplam Seçilen</span>
         <span class="fw-bold text-white fs-5" id="lbl-total-items">0 Ürün</span>
     </div>
     <button class="btn btn-success btn-lg px-4 fw-bold" id="btn-submit" onclick="submitOrder()" disabled>🚀 Mutfağa Gönder</button>
 </div>
 
 <script>
-    let selectedGarson = "";
+    let activeGarson = localStorage.getItem('sizir_garson_name') || "";
     let basket = {};
+    let myOrders = [];
+    const socket = io();
 
-    function selectGarson(name, btn) {
-        selectedGarson = name;
-        document.querySelectorAll('#garson-buttons button').forEach(b => b.classList.replace('btn-warning', 'btn-outline-warning'));
-        btn.classList.replace('btn-outline-warning', 'btn-warning');
-        document.getElementById('lbl-garson').innerText = name;
-        checkCanSubmit();
+    if (activeGarson) {
+        initGarsonSession();
+    }
+
+    function loginGarson() {
+        const name = document.getElementById('input-garson-name').value.trim();
+        if (!name) return alert("Lütfen isminizi girin!");
+        activeGarson = name;
+        localStorage.setItem('sizir_garson_name', activeGarson);
+        initGarsonSession();
+    }
+
+    function logoutGarson() {
+        localStorage.removeItem('sizir_garson_name');
+        location.reload();
+    }
+
+    function initGarsonSession() {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app-content').style.display = 'block';
+        document.getElementById('basket-bar').style.setProperty('display', 'flex', 'important');
+        document.getElementById('garson-title').innerText = activeGarson;
     }
 
     function updateQty(item, change) {
@@ -72,20 +115,13 @@
         basket[item] = Math.max(0, basket[item] + change);
         document.getElementById(`qty-${item}`).innerText = basket[item];
         if (basket[item] === 0) delete basket[item];
-        
+
         let totalCount = Object.values(basket).reduce((a, b) => a + b, 0);
         document.getElementById('lbl-total-items').innerText = `${totalCount} Ürün`;
-        checkCanSubmit();
-    }
-
-    function checkCanSubmit() {
-        let totalCount = Object.values(basket).reduce((a, b) => a + b, 0);
-        document.getElementById('btn-submit').disabled = !(selectedGarson && totalCount > 0);
+        document.getElementById('btn-submit').disabled = totalCount === 0;
     }
 
     function submitOrder() {
-        if (!selectedGarson) return alert("Lütfen Garson seçin!");
-
         let itemsPayload = [];
         for (let [name, qty] of Object.entries(basket)) {
             itemsPayload.push({ name: name, qty: qty });
@@ -94,19 +130,92 @@
         fetch('/api/siparis-ver', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ garson: selectedGarson, items: itemsPayload })
+            body: JSON.stringify({ garson: activeGarson, items: itemsPayload })
         })
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                alert(`✅ Sipariş #${data.order_id} Mutfağa İletildi!`);
-                // Sepeti Sıfırla
                 basket = {};
                 document.querySelectorAll('[id^="qty-"]').forEach(el => el.innerText = '0');
                 document.getElementById('lbl-total-items').innerText = '0 Ürün';
-                checkCanSubmit();
+                document.getElementById('btn-submit').disabled = true;
             }
         });
+    }
+
+    // SOCKET DINLEMELERI (Sadece Garsonun Kendi Verileri)
+    socket.on('tum_siparisler', (orders) => {
+        myOrders = orders.filter(o => o.garson === activeGarson);
+        renderMyOrders();
+        updateStats();
+    });
+
+    socket.on('yeni_siparis', (order) => {
+        if (order.garson === activeGarson) {
+            myOrders.push(order);
+            renderMyOrders();
+            updateStats();
+        }
+    });
+
+    socket.on('siparis_guncellendi', (order) => {
+        if (order.garson === activeGarson) {
+            let idx = myOrders.findIndex(o => o.order_id === order.order_id);
+            if (idx !== -1) myOrders[idx] = order;
+            renderMyOrders();
+            updateStats();
+        }
+    });
+
+    socket.on('siparis_silindi', (data) => {
+        myOrders = myOrders.filter(o => o.order_id !== data.order_id);
+        renderMyOrders();
+        updateStats();
+    });
+
+    function renderMyOrders() {
+        const container = document.getElementById('my-orders-list');
+        if (myOrders.length === 0) {
+            container.innerHTML = '<p class="text-secondary small">Henüz bekleyen siparişiniz yok.</p>';
+            return;
+        }
+
+        container.innerHTML = myOrders.map(o => {
+            let itemsHtml = o.items.map(i => `
+                <div class="d-flex justify-content-between border-bottom border-secondary py-1 small">
+                    <span>${i.qty}x ${i.name}</span>
+                    <span class="${i.status === 'hazir' ? 'text-success fw-bold' : 'text-warning'}">
+                        ${i.status === 'hazir' ? '✅ Hazır' : '⏳ Hazırlanıyor'}
+                    </span>
+                </div>
+            `).join('');
+
+            return `
+                <div class="order-badge mb-2">
+                    <div class="d-flex justify-content-between fw-bold text-accent mb-1">
+                        <span>Sipariş #${o.order_id}</span>
+                        <span class="text-secondary">${o.time}</span>
+                    </div>
+                    ${itemsHtml}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function updateStats() {
+        document.getElementById('stat-total-orders').innerText = myOrders.length;
+        
+        let itemCounts = {};
+        myOrders.forEach(o => {
+            o.items.forEach(i => {
+                itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty;
+            });
+        });
+
+        const breakdownContainer = document.getElementById('stat-items-breakdown');
+        breakdownContainer.innerHTML = Object.entries(itemCounts).map(([name, count]) => `
+            <span class="badge bg-secondary p-2 fs-6">${name}: <strong class="text-warning">${count} Adet</strong></span>
+        `).join('');
     }
 </script>
 </body>
