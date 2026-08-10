@@ -26,6 +26,12 @@ def init_db():
         )
     ''')
     cursor.execute('''
+        CREATE TABLE IF NOT EXISTS admin_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS orders (
             order_id TEXT PRIMARY KEY,
             garson TEXT NOT NULL,
@@ -34,7 +40,10 @@ def init_db():
             status TEXT NOT NULL
         )
     ''')
-    # Varsayılan garsonları ekle
+    # Varsayılan admin şifresi
+    cursor.execute("INSERT OR IGNORE INTO admin_config (key, value) VALUES ('admin_pass', 'admin123')")
+    
+    # Varsayılan garsonlar
     default_users = [
         ('ahmet', 'Ahmet', '1234'),
         ('mehmet', 'Mehmet', '1234'),
@@ -81,7 +90,13 @@ def admin_login():
     data = request.get_json(silent=True) or {}
     username = data.get('username')
     password = data.get('password')
-    if username == 'admin' and password == 'admin123':
+    
+    conn = get_db()
+    row = conn.execute("SELECT value FROM admin_config WHERE key = 'admin_pass'").fetchone()
+    current_pass = row['value'] if row else 'admin123'
+    conn.close()
+
+    if username == 'admin' and password == current_pass:
         session['admin_logged_in'] = True
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Yönetici şifresi hatalı!"}), 400
@@ -206,7 +221,7 @@ def admin_users():
 
     if request.method == 'POST':
         data = request.json
-        u, n, p = data.get('username'), data.get('name'), data.get('password')
+        u, n, p = data.get('username', '').strip().lower(), data.get('name', '').strip(), data.get('password', '').strip()
         conn.execute("INSERT OR REPLACE INTO users (username, name, password) VALUES (?, ?, ?)", (u, n, p))
         conn.commit()
         conn.close()
@@ -218,6 +233,60 @@ def admin_users():
         conn.commit()
         conn.close()
         return jsonify({"status": "success"})
+
+@app.route('/api/admin/change-pass', methods=['POST'])
+def change_admin_pass():
+    if not session.get('admin_logged_in'):
+        return jsonify({"status": "unauthorized"}), 401
+    new_pass = request.json.get('password', '').strip()
+    if not new_pass:
+        return jsonify({"status": "error", "message": "Şifre boş olamaz!"}), 400
+    
+    conn = get_db()
+    conn.execute("UPDATE admin_config SET value = ? WHERE key = 'admin_pass'", (new_pass,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+@app.route('/api/admin/reports', methods=['GET'])
+def get_admin_reports():
+    if not session.get('admin_logged_in'):
+        return jsonify({"status": "unauthorized"}), 401
+    
+    conn = get_db()
+    orders = conn.execute("SELECT * FROM orders").fetchall()
+    conn.close()
+
+    product_stats = {}
+    garson_stats = {}
+    total_orders_count = len(orders)
+
+    for o in orders:
+        garson_name = o['garson']
+        garson_stats[garson_name] = garson_stats.get(garson_name, 0) + 1
+        
+        items = json.loads(o['items_json'])
+        for i in items:
+            p_name = i['name']
+            p_qty = i['qty']
+            product_stats[p_name] = product_stats.get(p_name, 0) + p_qty
+
+    return jsonify({
+        "total_orders": total_orders_count,
+        "product_stats": product_stats,
+        "garson_stats": garson_stats
+    })
+
+@app.route('/api/admin/clear-orders', methods=['POST'])
+def clear_all_orders():
+    if not session.get('admin_logged_in'):
+        return jsonify({"status": "unauthorized"}), 401
+    
+    conn = get_db()
+    conn.execute("DELETE FROM orders")
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
 
 @socketio.on('connect')
 def handle_connect():
