@@ -8,16 +8,16 @@ from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sizir_alabalik_secret_key_2026'
-socketio = SocketIO(app, cors_allowed_origins="*")
 
-# TELEGRAM BOT BİLGİLERİ (İsteğe Bağlı)
+# Render arkasındaki WebSockets ve API istekleri için async_mode='gevent'
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 
 order_counter = 100
 active_orders = {}
 
-# SADECE İSTENEN MENÜ ÜRÜNLERİ (Köz Tabağı Dahil)
 MENU_ITEMS = [
     "Izgara Balık",
     "Sivas Köfte",
@@ -27,7 +27,6 @@ MENU_ITEMS = [
     "Köz Tabağı"
 ]
 
-# 🔐 GARSON HESAPLARI VE ŞİFRELERİ (Kullanıcı Adı : Şifre)
 GARSON_HESAPLARI = {
     "ahmet": {"name": "Ahmet", "pass": "1234"},
     "mehmet": {"name": "Mehmet", "pass": "1234"},
@@ -57,40 +56,23 @@ def index():
 def mutfak():
     return render_template('mutfak.html')
 
-# 🔑 GARSON HESAP GİRİŞİ API (Garantili & Hata Vermeyen Sürüm)
-@app.route('/api/login', methods=['POST', 'GET'])
+@app.route('/api/login', methods=['POST'])
 def garson_login():
-    if request.method == 'GET':
-        return jsonify({"status": "ok", "message": "Login API aktif"})
+    data = request.get_json(silent=True) or {}
+    username = str(data.get('username', '')).strip().lower()
+    password = str(data.get('password', '')).strip()
 
-    try:
-        data = request.get_json(force=True) or {}
-        username = str(data.get('username', '')).strip().lower()
-        password = str(data.get('password', '')).strip()
+    username = username.replace('ı', 'i').replace('ğ', 'g').replace('ü', 'u').replace('ş', 's').replace('ö', 'o').replace('ç', 'c')
 
-        # Türkçe karakter dönüştürme (Hatalı yazımları engellemek için)
-        username = username.replace('ı', 'i').replace('ğ', 'g').replace('ü', 'u').replace('ş', 's').replace('ö', 'o').replace('ç', 'c')
-
-        print(f"[LOGIN DENEMESI]: Kullanıcı: '{username}' | Şifre: '{password}'")
-
-        if username in GARSON_HESAPLARI and GARSON_HESAPLARI[username]['pass'] == password:
-            return jsonify({
-                "status": "success", 
-                "garson_name": GARSON_HESAPLARI[username]['name']
-            })
-        else:
-            return jsonify({
-                "status": "error", 
-                "message": "Kullanıcı adı veya şifre hatalı!"
-            }), 400
-    except Exception as e:
-        print(f"[LOGIN HATA]: {e}")
-        return jsonify({"status": "error", "message": "Sunucu hatası oluştu"}), 500
+    if username in GARSON_HESAPLARI and GARSON_HESAPLARI[username]['pass'] == password:
+        return jsonify({"status": "success", "garson_name": GARSON_HESAPLARI[username]['name']})
+    
+    return jsonify({"status": "error", "message": "Kullanıcı adı veya şifre hatalı!"}), 400
 
 @app.route('/api/siparis-ver', methods=['POST'])
 def siparis_ver():
     global order_counter
-    data = request.json
+    data = request.get_json(silent=True) or {}
 
     garson = data.get('garson')
     items = data.get('items', [])
@@ -126,7 +108,7 @@ def siparis_ver():
 
 @app.route('/api/item-durum-degistir', methods=['POST'])
 def item_durum_degistir():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     order_id = str(data.get('order_id'))
     item_id = data.get('item_id')
 
@@ -158,7 +140,7 @@ def item_durum_degistir():
 
 @app.route('/api/siparis-sil', methods=['POST'])
 def siparis_sil():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     order_id = str(data.get('order_id'))
     if order_id in active_orders:
         del active_orders[order_id]
@@ -172,4 +154,4 @@ def handle_connect():
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True, debug=False)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
