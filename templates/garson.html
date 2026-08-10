@@ -26,17 +26,19 @@
         
         <div id="login-error" class="alert alert-danger py-2 small d-none text-center"></div>
 
-        <div class="mb-3">
-            <label class="form-label text-secondary small fw-bold">Kullanıcı Adı</label>
-            <input type="text" id="input-username" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="Örn: ahmet" autocomplete="off">
-        </div>
+        <form onsubmit="event.preventDefault(); doLogin();">
+            <div class="mb-3">
+                <label class="form-label text-secondary small fw-bold">Kullanıcı Adı</label>
+                <input type="text" id="input-username" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="Örn: ahmet" required>
+            </div>
 
-        <div class="mb-4">
-            <label class="form-label text-secondary small fw-bold">Şifre</label>
-            <input type="password" id="input-password" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="••••">
-        </div>
+            <div class="mb-4">
+                <label class="form-label text-secondary small fw-bold">Şifre</label>
+                <input type="password" id="input-password" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="••••" required>
+            </div>
 
-        <button type="button" id="btn-login-action" class="btn btn-primary btn-lg w-100 fw-bold" onclick="loginGarson()">Giriş Yap</button>
+            <button type="submit" id="btn-login-action" class="btn btn-primary btn-lg w-100 fw-bold">Giriş Yap</button>
+        </form>
     </div>
 </div>
 
@@ -100,57 +102,44 @@
         if (activeGarson) {
             initGarsonSession();
         }
-
-        // Enter tuşuna basınca giriş yapmayı sağla
-        document.getElementById('input-password').addEventListener('keyup', function(e) {
-            if (e.key === 'Enter') loginGarson();
-        });
     });
 
-    function loginGarson() {
-        const usernameInput = document.getElementById('input-username');
-        const passwordInput = document.getElementById('input-password');
+    async function doLogin() {
+        const usernameVal = document.getElementById('input-username').value.trim();
+        const passwordVal = document.getElementById('input-password').value.trim();
         const errDiv = document.getElementById('login-error');
         const loginBtn = document.getElementById('btn-login-action');
 
-        const username = usernameInput ? usernameInput.value.trim() : "";
-        const password = passwordInput ? passwordInput.value.trim() : "";
-
-        if (!username || !password) {
-            errDiv.innerText = "Lütfen kullanıcı adı ve şifrenizi girin!";
-            errDiv.classList.remove('d-none');
-            return;
-        }
-
+        errDiv.classList.add('d-none');
         loginBtn.disabled = true;
-        loginBtn.innerText = "Giriş Yapılıyor...";
+        loginBtn.innerText = "Kontrol Ediliyor...";
 
-        fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username, password: password })
-        })
-        .then(res => res.json())
-        .then(data => {
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: usernameVal, password: passwordVal })
+            });
+
+            const data = await response.json();
+
             loginBtn.disabled = false;
             loginBtn.innerText = "Giriş Yap";
 
-            if (data.status === 'success') {
-                errDiv.classList.add('d-none');
+            if (response.ok && data.status === 'success') {
                 activeGarson = data.garson_name;
                 localStorage.setItem('sizir_garson_name', activeGarson);
                 initGarsonSession();
             } else {
-                errDiv.innerText = data.message || "Kullanıcı adı veya şifre hatalı!";
+                errDiv.innerText = data.message || "Giriş Başarısız!";
                 errDiv.classList.remove('d-none');
             }
-        })
-        .catch(err => {
+        } catch (err) {
             loginBtn.disabled = false;
             loginBtn.innerText = "Giriş Yap";
-            errDiv.innerText = "Bağlantı hatası oluştu! Lütfen tekrar deneyin.";
+            errDiv.innerText = "Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.";
             errDiv.classList.remove('d-none');
-        });
+        }
     }
 
     function logoutGarson() {
