@@ -1,15 +1,13 @@
 import os
 import json
 import sqlite3
-import urllib.request
-import threading
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sizir_alabalik_secret_key_2026'
 
-from flask_socketio import SocketIO, emit
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 DB_FILE = 'sizir_alabalik.db'
@@ -188,7 +186,33 @@ def item_durum_degistir():
     conn.close()
     return jsonify({"status": "error"}), 404
 
-# MUTFAK TAMAMLAR (VERİTABANINDAN SİLİNMEZ! SADECE DURUM 'mutfak_tamam' OLUR)
+# GARSON SİPARİŞİ TEZGAHTAN TESLİM ALDI
+@app.route('/api/garson-teslim-aldi', methods=['POST'])
+def garson_teslim_aldi():
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get('order_id'))
+    conn = get_db()
+    
+    row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
+    if row:
+        conn.execute("UPDATE orders SET status = 'garson_alindi' WHERE order_id = ?", (order_id,))
+        conn.commit()
+        
+        updated_order = {
+            "order_id": order_id,
+            "garson": row['garson'],
+            "time": row['time_str'],
+            "items": json.loads(row['items_json']),
+            "status": "garson_alindi"
+        }
+        conn.close()
+        socketio.emit('siparis_guncellendi', updated_order)
+        return jsonify({"status": "success"})
+
+    conn.close()
+    return jsonify({"status": "error"}), 404
+
+# MUTFAK SİPARİŞİ TAMAMLADI (KARARIR VE ALT SIRAYA GEÇER)
 @app.route('/api/mutfak-tamamla', methods=['POST'])
 def mutfak_tamamla():
     data = request.get_json(silent=True) or {}
@@ -197,18 +221,14 @@ def mutfak_tamamla():
     
     row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
     if row:
-        items = json.loads(row['items_json'])
-        for item in items:
-            item['status'] = 'hazir'
-            
-        conn.execute("UPDATE orders SET status = 'mutfak_tamam', items_json = ? WHERE order_id = ?", (json.dumps(items), order_id))
+        conn.execute("UPDATE orders SET status = 'mutfak_tamam' WHERE order_id = ?", (order_id,))
         conn.commit()
         
         updated_order = {
             "order_id": order_id,
             "garson": row['garson'],
             "time": row['time_str'],
-            "items": items,
+            "items": json.loads(row['items_json']),
             "status": "mutfak_tamam"
         }
         conn.close()
@@ -218,19 +238,32 @@ def mutfak_tamamla():
     conn.close()
     return jsonify({"status": "error"}), 404
 
-# GARSON MASAYA TESLİM EDER (GARSON EKRANINDAN KALKAR)
-@app.route('/api/garson-teslim-et', methods=['POST'])
-def garson_teslim_et():
+# ↩️ GERİ ALMA API'Sİ (MUTFAK VEYA GARSON İÇİN)
+@app.route('/api/siparis-geri-al', methods=['POST'])
+def siparis_geri_al():
     data = request.get_json(silent=True) or {}
     order_id = str(data.get('order_id'))
-    conn = get_db()
+    target_status = data.get('target_status', 'aktif')
     
-    conn.execute("UPDATE orders SET status = 'tamamlandi' WHERE order_id = ?", (order_id,))
-    conn.commit()
-    conn.close()
+    conn = get_db()
+    row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
+    if row:
+        conn.execute("UPDATE orders SET status = ? WHERE order_id = ?", (target_status, order_id))
+        conn.commit()
+        
+        updated_order = {
+            "order_id": order_id,
+            "garson": row['garson'],
+            "time": row['time_str'],
+            "items": json.loads(row['items_json']),
+            "status": target_status
+        }
+        conn.close()
+        socketio.emit('siparis_guncellendi', updated_order)
+        return jsonify({"status": "success"})
 
-    socketio.emit('siparis_teslim_edildi', {"order_id": order_id})
-    return jsonify({"status": "success"})
+    conn.close()
+    return jsonify({"status": "error"}), 404
 
 # YÖNETİCİ PANELİ API'LERİ
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
@@ -326,7 +359,7 @@ def clear_all_orders():
 @socketio.on('connect')
 def handle_connect():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM orders WHERE status IN ('aktif', 'mutfak_tamam')").fetchall()
+    rows = conn.execute("SELECT * FROM orders").fetchall()
     conn.close()
 
     orders = []
