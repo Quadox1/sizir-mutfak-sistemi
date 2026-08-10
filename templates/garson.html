@@ -15,7 +15,7 @@
         .item-row { background-color: #2a2a3c; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid #45475a; }
         .order-badge { background-color: #2a2a3c; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 2px solid #45475a; }
         .order-badge.ready-notify { border: 3px solid #a6e3a1 !important; background-color: #1c2b22 !important; }
-        .order-badge.garson-took-badge { border: 2px solid #f9e2af !important; background-color: #2b281d !important; }
+        .order-badge.garson-took-badge { border: 2px solid #f9e2af !important; background-color: #2b281d !important; opacity: 0.6; }
         .item-text-lg { color: #ffffff !important; font-weight: 700; font-size: 1.25rem; }
     </style>
 </head>
@@ -91,6 +91,15 @@
     let myOrders = [];
     const socket = io();
     const readyAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+
+    const MENU_ORDER = [
+        "Izgara Balık",
+        "Sivas Köfte",
+        "Tavuk Kanat",
+        "Kiremitte Balık",
+        "Kaşarlı Balık",
+        "Köz Tabağı"
+    ];
 
     document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('btn-login-action').addEventListener('click', loginGarson);
@@ -178,7 +187,7 @@
     socket.on('siparis_guncellendi', (order) => {
         if (order.garson === activeGarson) {
             let hasReadyItem = order.items.some(i => i.status === 'hazir');
-            if (hasReadyItem && order.status !== 'garson_alindi') {
+            if (hasReadyItem && order.status !== 'mutfak_tamam') {
                 try { readyAudio.play(); } catch(e){}
             }
             let idx = myOrders.findIndex(o => o.order_id === order.order_id);
@@ -188,19 +197,16 @@
         }
     });
 
+    socket.on('siparis_silindi', (data) => {
+        myOrders = myOrders.filter(o => o.order_id !== data.order_id);
+        renderMyOrders();
+    });
+
     function teslimAldim(orderId) {
         fetch('/api/garson-teslim-aldi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order_id: orderId })
-        });
-    }
-
-    function geriAlGarson(orderId) {
-        fetch('/api/siparis-geri-al', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_id: orderId, target_status: 'aktif' })
         });
     }
 
@@ -212,20 +218,26 @@
         }
 
         container.innerHTML = myOrders.map(o => {
-            let isGarsonTook = (o.status === 'garson_alindi');
+            let isMutfakDone = (o.status === 'mutfak_tamam');
             let hasReadyItem = o.items.some(i => i.status === 'hazir');
 
-            let itemsHtml = o.items.map(i => `
+            let sortedItems = [...o.items].sort((a, b) => {
+                let idxA = MENU_ORDER.indexOf(a.name);
+                let idxB = MENU_ORDER.indexOf(b.name);
+                return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+            });
+
+            let itemsHtml = sortedItems.map(i => `
                 <div class="d-flex justify-content-between border-bottom border-secondary py-2">
                     <span class="item-text-lg">${i.qty}x ${i.name}</span>
-                    <span class="${i.status === 'hazir' ? 'text-success fw-bold fs-5' : 'text-warning fw-bold fs-5'}">
-                        ${i.status === 'hazir' ? '✅ HAZIR' : '⏳ Hazırlanıyor'}
+                    <span class="${i.status === 'hazir' || isMutfakDone ? 'text-success fw-bold fs-5' : 'text-warning fw-bold fs-5'}">
+                        ${i.status === 'hazir' || isMutfakDone ? '✅ HAZIR' : '⏳ Hazırlanıyor'}
                     </span>
                 </div>
             `).join('');
 
             return `
-                <div class="order-badge ${hasReadyItem && !isGarsonTook ? 'ready-notify' : ''} ${isGarsonTook ? 'garson-took-badge' : ''}">
+                <div class="order-badge ${hasReadyItem && !isMutfakDone ? 'ready-notify' : ''} ${isMutfakDone ? 'garson-took-badge' : ''}">
                     <div class="d-flex justify-content-between fw-bold text-warning mb-2 fs-5">
                         <span>Sipariş #${o.order_id}</span>
                         <span class="text-light">${o.time}</span>
@@ -234,16 +246,13 @@
                     ${itemsHtml}
 
                     <div class="mt-3">
-                        ${!isGarsonTook ? `
+                        ${!isMutfakDone ? `
                             <button class="btn btn-warning btn-lg w-100 py-2 fw-bold fs-5" onclick="teslimAldim('${o.order_id}')">
                                 🏃 Siparişi Mutfaktan Teslim Aldım
                             </button>
                         ` : `
-                            <div class="d-flex justify-content-between align-items-center bg-dark p-2 rounded border border-warning">
-                                <span class="text-success fw-bold">✅ Mutfaktan Alındı</span>
-                                <button class="btn btn-outline-secondary btn-sm fw-bold" onclick="geriAlGarson('${o.order_id}')">
-                                    ↩️ Geri Al
-                                </button>
+                            <div class="text-center bg-dark p-2 rounded border border-secondary text-success fw-bold">
+                                ✅ Mutfaktan Teslim Alındı (Tamamlandı)
                             </div>
                         `}
                     </div>
