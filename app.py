@@ -10,19 +10,21 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sizir_alabalik_secret_key_2026'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# TELEGRAM BOT BİLGİLERİ (İsteğe Bağlı)
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 
 order_counter = 100
 active_orders = {}
 
-# SADECE İSTENEN MENÜ ÜRÜNLERİ
+# SADECE İSTENEN MENÜ ÜRÜNLERİ (Köz Tabağı Dahil)
 MENU_ITEMS = [
     "Izgara Balık",
     "Sivas Köfte",
     "Tavuk Kanat",
     "Kiremitte Balık",
-    "Kaşarlı Balık"
+    "Kaşarlı Balık",
+    "Köz Tabağı"
 ]
 
 # 🔐 GARSON HESAPLARI VE ŞİFRELERİ (Kullanıcı Adı : Şifre)
@@ -30,7 +32,8 @@ GARSON_HESAPLARI = {
     "ahmet": {"name": "Ahmet", "pass": "1234"},
     "mehmet": {"name": "Mehmet", "pass": "1234"},
     "can": {"name": "Can", "pass": "1234"},
-    "unal": {"name": "Ünal", "pass": "1234"}
+    "unal": {"name": "Ünal", "pass": "1234"},
+    "tugce": {"name": "Tuğçe", "pass": "1234"}
 }
 
 def send_telegram_notification(message):
@@ -54,23 +57,35 @@ def index():
 def mutfak():
     return render_template('mutfak.html')
 
-# 🔑 GARSON HESAP GİRİŞİ API
-@app.route('/api/login', methods=['POST'])
+# 🔑 GARSON HESAP GİRİŞİ API (Garantili & Hata Vermeyen Sürüm)
+@app.route('/api/login', methods=['POST', 'GET'])
 def garson_login():
-    data = request.json
-    username = data.get('username', '').strip().lower()
-    password = data.get('password', '').strip()
+    if request.method == 'GET':
+        return jsonify({"status": "ok", "message": "Login API aktif"})
 
-    if username in GARSON_HESAPLARI and GARSON_HESAPLARI[username]['pass'] == password:
-        return jsonify({
-            "status": "success", 
-            "garson_name": GARSON_HESAPLARI[username]['name']
-        })
-    else:
-        return jsonify({
-            "status": "error", 
-            "message": "Kullanıcı adı veya şifre hatalı!"
-        }), 401
+    try:
+        data = request.get_json(force=True) or {}
+        username = str(data.get('username', '')).strip().lower()
+        password = str(data.get('password', '')).strip()
+
+        # Türkçe karakter dönüştürme (Hatalı yazımları engellemek için)
+        username = username.replace('ı', 'i').replace('ğ', 'g').replace('ü', 'u').replace('ş', 's').replace('ö', 'o').replace('ç', 'c')
+
+        print(f"[LOGIN DENEMESI]: Kullanıcı: '{username}' | Şifre: '{password}'")
+
+        if username in GARSON_HESAPLARI and GARSON_HESAPLARI[username]['pass'] == password:
+            return jsonify({
+                "status": "success", 
+                "garson_name": GARSON_HESAPLARI[username]['name']
+            })
+        else:
+            return jsonify({
+                "status": "error", 
+                "message": "Kullanıcı adı veya şifre hatalı!"
+            }), 400
+    except Exception as e:
+        print(f"[LOGIN HATA]: {e}")
+        return jsonify({"status": "error", "message": "Sunucu hatası oluştu"}), 500
 
 @app.route('/api/siparis-ver', methods=['POST'])
 def siparis_ver():
