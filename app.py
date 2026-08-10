@@ -150,8 +150,6 @@ def handle_connect():
 
 
 if __name__ == '__main__':
-    # Wi-Fi ağındaki tüm cihazlardan erişilebilmesi için host='0.0.0.0'
-    print("\n🚀 Sızır Mutfak Sunucusu Başlatılıyor...")
-    print("📲 Garson Giriş Arayüzü : http://localhost:5000")
-    print("📺 Mutfak KDS Ekranı     : http://localhost:5000/mutfak\n")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"\n🚀 Sızır Mutfak Sunucusu Başlatılıyor... Port: {port}")
+    socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True, debug=False)
