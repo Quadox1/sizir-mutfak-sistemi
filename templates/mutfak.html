@@ -2,42 +2,112 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Mutfak Ekranı (KDS) — Sızır Alabalık</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sızır Alabalık — Mutfak & Fırın Ekranı (KDS)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        body { background-color: #0f0f15; color: #fff; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
-        .order-card { background-color: #1a1a24; border: 2px solid #2d2d3f; border-radius: 12px; transition: all 0.3s ease; }
-        .order-card.ready { border-color: #198754; opacity: 0.6; }
-        .order-header { background-color: #252538; border-bottom: 1px solid #333; padding: 10px 15px; border-radius: 10px 10px 0 0; }
-        .item-btn { text-align: left; font-size: 1.1rem; padding: 12px; border-radius: 8px; transition: 0.2s; }
-        .item-btn.hazirlaniyor { background-color: #2b2b3d; color: #fff; border: 1px solid #444; }
-        .item-btn.hazir { background-color: #198754; color: #fff; text-decoration: line-through; border-color: #198754; }
+        body { 
+            background-color: #12121e; 
+            color: #ffffff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            overflow-x: hidden;
+        }
+        .header-panel {
+            background-color: #1e1e2e;
+            border-bottom: 2px solid #313244;
+            padding: 12px 20px;
+        }
+        .order-card { 
+            background-color: #1e1e2e; 
+            border: 2px solid #313244; 
+            border-radius: 14px; 
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .order-card.ready-all { 
+            border-color: #a6e3a1 !important; 
+            box-shadow: 0 0 15px rgba(166, 227, 161, 0.2);
+        }
+        .order-header { 
+            background-color: #2a2a3c; 
+            border-bottom: 1px solid #45475a; 
+            padding: 12px 16px; 
+            border-radius: 12px 12px 0 0; 
+        }
+        .item-btn { 
+            text-align: left; 
+            font-size: 1.15rem; 
+            font-weight: 600;
+            padding: 12px 16px; 
+            border-radius: 10px; 
+            transition: all 0.2s ease;
+            cursor: pointer;
+            user-select: none;
+        }
+        .item-btn.hazirlaniyor { 
+            background-color: #2a2a3c; 
+            color: #cdd6f4; 
+            border: 1px solid #45475a; 
+        }
+        .item-btn.hazirlaniyor:hover {
+            background-color: #313244;
+            border-color: #89b4fa;
+        }
+        .item-btn.hazir { 
+            background-color: #2e4438; 
+            color: #a6e3a1; 
+            text-decoration: line-through; 
+            border: 1px solid #a6e3a1; 
+        }
+        .badge-garson {
+            background-color: #89b4fa;
+            color: #11111b;
+            font-size: 0.95rem;
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
     </style>
 </head>
-<body class="p-3">
+<body class="p-0">
 
-<header class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary">
-    <h2 class="text-warning fw-bold m-0">🍳 Sızır Mutfak & Fırın Takip Paneli</h2>
-    <span class="badge bg-success fs-6" id="connection-status">🟢 Canlı Bağlantı</span>
+<!-- ÜST BİLGİ VE BAŞLIK BAR -->
+<header class="header-panel d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <h3 class="text-warning fw-bold m-0">🍳 Sızır Mutfak & Fırın Ekranı</h3>
+        <span class="badge bg-dark text-secondary border border-secondary px-3 py-2">Canlı Takip</span>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <span class="badge bg-success fs-6 px-3 py-2" id="connection-status">🟢 Sistem Canlı</span>
+    </div>
 </header>
 
-<div class="row g-3" id="orders-container">
-    <!-- Sipariş Kartları Buraya Dinamik Düşecek -->
+<!-- SİPARİŞ KARTLARI KONTEYNERİ -->
+<div class="container-fluid px-4">
+    <div class="row g-3" id="orders-container">
+        <!-- Sipariş Kartları Dinamik Düşecek -->
+    </div>
 </div>
 
 <script>
     const socket = io();
-    const alertAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Zil sesi
+    // Yeni Sipariş Bildirim Zili
+    const alertAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 
     socket.on('tum_siparisler', (orders) => {
         const container = document.getElementById('orders-container');
         container.innerHTML = '';
-        orders.forEach(order => renderOrderCard(order));
+        if (orders.length === 0) {
+            renderEmptyState();
+        } else {
+            orders.forEach(order => renderOrderCard(order));
+        }
     });
 
     socket.on('yeni_siparis', (order) => {
         try { alertAudio.play(); } catch(e){}
+        removeEmptyState();
         renderOrderCard(order);
     });
 
@@ -51,7 +121,27 @@
     socket.on('siparis_silindi', (data) => {
         const card = document.getElementById(`card-${data.order_id}`);
         if (card) card.remove();
+        if (document.getElementById('orders-container').children.length === 0) {
+            renderEmptyState();
+        }
     });
+
+    function renderEmptyState() {
+        const container = document.getElementById('orders-container');
+        container.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <h4 class="text-secondary fw-bold">🚀 Bekleyen Sipariş Bulunmuyor</h4>
+                <p class="text-muted">Garsonlar sipariş girdikçe kartlar buraya düşecektir.</p>
+            </div>
+        `;
+    }
+
+    function removeEmptyState() {
+        const container = document.getElementById('orders-container');
+        if (container.querySelector('.text-center')) {
+            container.innerHTML = '';
+        }
+    }
 
     function renderOrderCard(order) {
         const container = document.getElementById('orders-container');
@@ -69,23 +159,27 @@
         let itemsHtml = order.items.map(item => `
             <button class="btn w-100 item-btn mb-2 d-flex justify-content-between align-items-center ${item.status}" 
                     onclick="toggleItemStatus('${order.order_id}', '${item.id}')">
-                <span><strong>${item.qty}x</strong> ${item.name}</span>
-                <span>${item.status === 'hazir' ? '✅' : '⏳'}</span>
+                <span><strong class="text-warning fs-5 me-1">${item.qty}x</strong> ${item.name}</span>
+                <span class="fs-5">${item.status === 'hazir' ? '✅' : '⏳'}</span>
             </button>
         `).join('');
 
         col.innerHTML = `
-            <div class="order-card ${isAllReady ? 'ready' : ''}">
+            <div class="order-card ${isAllReady ? 'ready-all' : ''}">
                 <div class="order-header d-flex justify-content-between align-items-center">
                     <div>
-                        <span class="fs-4 fw-bold text-warning">#${order.order_id}</span>
-                        <span class="badge bg-primary ms-2 fs-6">👤 ${order.garson}</span>
+                        <span class="fs-3 fw-bold text-warning">#${order.order_id}</span>
                     </div>
-                    <span class="text-secondary small">🕒 ${order.time}</span>
+                    <div class="text-end">
+                        <span class="badge-garson d-block mb-1">👤 ${order.garson}</span>
+                        <span class="text-secondary small fw-bold">🕒 ${order.time}</span>
+                    </div>
                 </div>
                 <div class="p-3">
                     ${itemsHtml}
-                    <button class="btn btn-outline-danger btn-sm w-100 mt-2" onclick="deleteOrder('${order.order_id}')">🗑️ Siparişi Kapat</button>
+                    <button class="btn btn-outline-danger btn-sm w-100 mt-2 py-2 fw-bold" onclick="deleteOrder('${order.order_id}')">
+                        🗑️ Siparişi Tamamla & Kapat
+                    </button>
                 </div>
             </div>
         `;
