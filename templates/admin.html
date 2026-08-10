@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Sızır Alabalık — Yönetici Paneli</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-white p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🛡️ Sızır Alabalık Yönetim Paneli</h2>
+        <button class="btn btn-outline-danger" onclick="logoutAdmin()">Çıkış Yap</button>
+    </div>
+
+    <!-- Garson Hesap Yönetimi -->
+    <div class="card bg-secondary text-white p-3 mb-4">
+        <h4 class="mb-3">👤 Garson Hesaplarını Yönet</h4>
+        <div class="row g-2 mb-3">
+            <div class="col"><input type="text" id="new-u" class="form-control" placeholder="Kullanıcı Adı"></div>
+            <div class="col"><input type="text" id="new-n" class="form-control" placeholder="Garson İsmi"></div>
+            <div class="col"><input type="text" id="new-p" class="form-control" placeholder="Şifre"></div>
+            <div class="col"><button class="btn btn-success w-100" onclick="saveUser()">Ekle / Güncelle</button></div>
+        </div>
+        <table class="table table-dark table-striped">
+            <thead>
+                <tr><th>Kullanıcı Adı</th><th>Görünür İsim</th><th>Şifre</th><th>İşlem</th></tr>
+            </thead>
+            <tbody id="user-table"></tbody>
+        </table>
+    </div>
+
+<script>
+    function loadUsers() {
+        fetch('/api/admin/users').then(res => res.json()).then(users => {
+            document.getElementById('user-table').innerHTML = users.map(u => `
+                <tr>
+                    <td>${u.username}</td>
+                    <td>${u.name}</td>
+                    <td>${u.password}</td>
+                    <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">Sil</button></td>
+                </tr>
+            `).join('');
+        });
+    }
+
+    function saveUser() {
+        fetch('/api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: document.getElementById('new-u').value,
+                name: document.getElementById('new-n').value,
+                password: document.getElementById('new-p').value
+            })
+        }).then(() => {
+            loadUsers();
+            document.getElementById('new-u').value = '';
+            document.getElementById('new-n').value = '';
+            document.getElementById('new-p').value = '';
+        });
+    }
+
+    function deleteUser(id) {
+        fetch('/api/admin/users', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        }).then(() => loadUsers());
+    }
+
+    function logoutAdmin() {
+        fetch('/api/admin-logout', { method: 'POST' }).then(() => location.reload());
+    }
+
+    loadUsers();
+</script>
+</body>
+</html>
