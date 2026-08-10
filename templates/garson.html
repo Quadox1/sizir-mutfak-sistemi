@@ -14,7 +14,8 @@
         .basket-bar { position: fixed; bottom: 0; left: 0; right: 0; background-color: #181825; border-top: 2px solid #89b4fa; padding: 12px 16px; z-index: 1000; }
         .item-row { background-color: #2a2a3c; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid #45475a; }
         .order-badge { background-color: #2a2a3c; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 2px solid #45475a; }
-        .order-badge.mutfak-ready { border: 3px solid #a6e3a1 !important; background-color: #1c2b22 !important; }
+        .order-badge.ready-notify { border: 3px solid #a6e3a1 !important; background-color: #1c2b22 !important; }
+        .order-badge.garson-took-badge { border: 2px solid #f9e2af !important; background-color: #2b281d !important; }
         .item-text-lg { color: #ffffff !important; font-weight: 700; font-size: 1.25rem; }
     </style>
 </head>
@@ -64,9 +65,9 @@
 
     <!-- Mutfaktaki Siparişleriniz -->
     <div class="card card-dark p-3 mb-5">
-        <h5 class="text-info fw-bold mb-3">⏳ Mutfak & Servis Takibi</h5>
+        <h5 class="text-info fw-bold mb-3">⏳ Sipariş Takibi & Bildirimler</h5>
         <div id="my-orders-list">
-            <p class="text-secondary small">Henüz bekleyen siparişiniz yok.</p>
+            <p class="text-secondary small">Henüz siparişiniz yok.</p>
         </div>
     </div>
 </div>
@@ -153,7 +154,7 @@
     }
 
     socket.on('tum_siparisler', (orders) => {
-        myOrders = orders.filter(o => o.garson === activeGarson && o.status !== 'tamamlandi');
+        myOrders = orders.filter(o => o.garson === activeGarson);
         renderMyOrders();
     });
 
@@ -166,56 +167,77 @@
 
     socket.on('siparis_guncellendi', (order) => {
         if (order.garson === activeGarson) {
-            try { readyAudio.play(); } catch(e){}
+            let hasReadyItem = order.items.some(i => i.status === 'hazir');
+            if (hasReadyItem && order.status !== 'garson_alindi') {
+                try { readyAudio.play(); } catch(e){}
+            }
             let idx = myOrders.findIndex(o => o.order_id === order.order_id);
             if (idx !== -1) myOrders[idx] = order;
+            else myOrders.push(order);
             renderMyOrders();
         }
     });
 
-    socket.on('siparis_teslim_edildi', (data) => {
-        myOrders = myOrders.filter(o => o.order_id !== data.order_id);
-        renderMyOrders();
-    });
-
-    function teslimEt(orderId) {
-        fetch('/api/garson-teslim-et', {
+    function teslimAldim(orderId) {
+        fetch('/api/garson-teslim-aldi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order_id: orderId })
         });
     }
 
+    function geriAlGarson(orderId) {
+        fetch('/api/siparis-geri-al', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: orderId, target_status: 'aktif' })
+        });
+    }
+
     function renderMyOrders() {
         const container = document.getElementById('my-orders-list');
         if (myOrders.length === 0) {
-            container.innerHTML = '<p class="text-secondary small">Henüz bekleyen siparişiniz yok.</p>';
+            container.innerHTML = '<p class="text-secondary small">Henüz siparişiniz yok.</p>';
             return;
         }
 
         container.innerHTML = myOrders.map(o => {
+            let isGarsonTook = (o.status === 'garson_alindi');
             let isMutfakDone = (o.status === 'mutfak_tamam');
+            let hasReadyItem = o.items.some(i => i.status === 'hazir');
+
             let itemsHtml = o.items.map(i => `
                 <div class="d-flex justify-content-between border-bottom border-secondary py-2">
                     <span class="item-text-lg">${i.qty}x ${i.name}</span>
-                    <span class="${i.status === 'hazir' || isMutfakDone ? 'text-success fw-bold fs-5' : 'text-warning fw-bold fs-5'}">
-                        ${i.status === 'hazir' || isMutfakDone ? '✅ HAZIR' : '⏳ Hazırlanıyor'}
+                    <span class="${i.status === 'hazir' ? 'text-success fw-bold fs-5' : 'text-warning fw-bold fs-5'}">
+                        ${i.status === 'hazir' ? '✅ HAZIR' : '⏳ Hazırlanıyor'}
                     </span>
                 </div>
             `).join('');
 
             return `
-                <div class="order-badge ${isMutfakDone ? 'mutfak-ready' : ''}">
+                <div class="order-badge ${hasReadyItem && !isGarsonTook ? 'ready-notify' : ''} ${isGarsonTook ? 'garson-took-badge' : ''}">
                     <div class="d-flex justify-content-between fw-bold text-warning mb-2 fs-5">
                         <span>Sipariş #${o.order_id}</span>
-                        <span class="text-light">${o.time} ${isMutfakDone ? '🔔 (Mutfak Çıkardı!)' : ''}</span>
+                        <span class="text-light">${o.time}</span>
                     </div>
+
                     ${itemsHtml}
-                    ${isMutfakDone ? `
-                        <button class="btn btn-success btn-lg w-100 mt-3 py-2 fw-bold fs-5" onclick="teslimEt('${o.order_id}')">
-                            ✅ Masaya Teslim Edildi (Kapat)
-                        </button>
-                    ` : ''}
+
+                    <div class="mt-3">
+                        ${!isGarsonTook ? `
+                            <button class="btn btn-warning btn-lg w-100 py-2 fw-bold fs-5" onclick="teslimAldim('${o.order_id}')">
+                                🏃 Siparişi Mutfaktan Teslim Aldım
+                            </button>
+                        ` : `
+                            <div class="d-flex justify-content-between align-items-center bg-dark p-2 rounded border border-warning">
+                                <span class="text-success fw-bold">✅ Mutfaktan Alındı</span>
+                                <button class="btn btn-outline-secondary btn-sm fw-bold" onclick="geriAlGarson('${o.order_id}')">
+                                    ↩️ Geri Al
+                                </button>
+                            </div>
+                        `}
+                    </div>
                 </div>
             `;
         }).join('');
