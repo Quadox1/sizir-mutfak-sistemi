@@ -7,18 +7,20 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        body { background-color: #12121e; color: #ffffff; font-family: 'Segoe UI', sans-serif; }
-        .order-card { background-color: #1e1e2e; border: 2px solid #313244; border-radius: 14px; }
-        .order-card.ready-all { border-color: #a6e3a1 !important; }
-        .item-btn { text-align: left; font-size: 1.15rem; font-weight: 600; padding: 12px 16px; border-radius: 10px; }
-        .item-btn.hazirlaniyor { background-color: #2a2a3c; color: #cdd6f4; border: 1px solid #45475a; }
-        .item-btn.hazir { background-color: #2e4438; color: #a6e3a1; text-decoration: line-through; border: 1px solid #a6e3a1; }
+        body { background-color: #12121e; color: #ffffff; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        .order-card { background-color: #1e1e2e; border: 3px solid #313244; border-radius: 16px; }
+        .order-card.ready-all { border-color: #a6e3a1 !important; box-shadow: 0 0 20px rgba(166, 227, 161, 0.3); }
+        .item-btn { text-align: left; font-size: 1.4rem !important; font-weight: 700 !important; padding: 14px 18px; border-radius: 12px; }
+        .item-btn.hazirlaniyor { background-color: #2a2a3c; color: #ffffff; border: 2px solid #45475a; }
+        .item-btn.hazir { background-color: #1e3a2b; color: #a6e3a1; text-decoration: line-through; border: 2px solid #a6e3a1; }
+        .badge-garson-lg { font-size: 1.3rem !important; font-weight: 800 !important; padding: 8px 16px; background-color: #89b4fa; color: #11111b; border-radius: 10px; }
+        .order-no-lg { font-size: 2.2rem !important; font-weight: 900; color: #f9e2af; }
     </style>
 </head>
 <body class="p-3">
 
-<h3 class="text-warning fw-bold mb-4">🍳 Sızır Mutfak & Fırın Ekranı</h3>
-<div class="row g-3" id="orders-container"></div>
+<h2 class="text-warning fw-bold mb-4 border-bottom border-secondary pb-2">🍳 Sızır Mutfak & Fırın Ekranı</h2>
+<div class="row g-4" id="orders-container"></div>
 
 <script>
     const socket = io();
@@ -26,7 +28,7 @@
 
     socket.on('tum_siparisler', (orders) => {
         document.getElementById('orders-container').innerHTML = '';
-        orders.forEach(order => renderOrderCard(order));
+        orders.filter(o => o.status === 'aktif').forEach(order => renderOrderCard(order));
     });
 
     socket.on('yeni_siparis', (order) => {
@@ -36,12 +38,11 @@
 
     socket.on('siparis_guncellendi', (order) => {
         const card = document.getElementById(`card-${order.order_id}`);
-        if (card) card.replaceWith(createOrderCardElement(order));
-    });
-
-    socket.on('siparis_silindi', (data) => {
-        const card = document.getElementById(`card-${data.order_id}`);
-        if (card) card.remove();
+        if (order.status === 'mutfak_tamam') {
+            if (card) card.remove();
+        } else if (card) {
+            card.replaceWith(createOrderCardElement(order));
+        }
     });
 
     function renderOrderCard(order) {
@@ -57,20 +58,23 @@
         let itemsHtml = order.items.map(item => `
             <button class="btn w-100 item-btn mb-2 d-flex justify-content-between align-items-center ${item.status}" 
                     onclick="toggleItemStatus('${order.order_id}', '${item.id}')">
-                <span><strong class="text-warning me-1">${item.qty}x</strong> ${item.name}</span>
-                <span>${item.status === 'hazir' ? '✅' : '⏳'}</span>
+                <span><strong class="text-warning me-2 fs-3">${item.qty}x</strong> ${item.name}</span>
+                <span class="fs-3">${item.status === 'hazir' ? '✅' : '⏳'}</span>
             </button>
         `).join('');
 
         col.innerHTML = `
             <div class="order-card p-3 ${isAllReady ? 'ready-all' : ''}">
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="fs-4 fw-bold text-warning">#${order.order_id}</span>
-                    <span class="badge bg-primary fs-6">${order.garson}</span>
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                    <span class="order-no-lg">#${order.order_id}</span>
+                    <div class="text-end">
+                        <span class="badge-garson-lg d-block mb-1">👤 ${order.garson}</span>
+                        <span class="text-secondary fw-bold fs-6">🕒 ${order.time}</span>
+                    </div>
                 </div>
                 ${itemsHtml}
-                <button class="btn btn-danger btn-sm w-100 mt-2 py-2 fw-bold" onclick="deleteOrder('${order.order_id}')">
-                    🗑️ Siparişi Tamamla
+                <button class="btn btn-success btn-lg w-100 mt-3 py-3 fs-5 fw-bold" onclick="mutfakTamamla('${order.order_id}')">
+                    🚀 Servise Gönder (Garsona Bildir)
                 </button>
             </div>
         `;
@@ -85,9 +89,8 @@
         });
     }
 
-    // ONAY KUTUSU SİLİNDİ, DİREKT SİLER
-    function deleteOrder(orderId) {
-        fetch('/api/siparis-sil', {
+    function mutfakTamamla(orderId) {
+        fetch('/api/mutfak-tamamla', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order_id: orderId })
