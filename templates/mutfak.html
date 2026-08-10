@@ -20,7 +20,13 @@
 </head>
 <body class="p-3">
 
-<h2 class="text-warning fw-bold mb-4 border-bottom border-secondary pb-2">🍳 Sızır Mutfak & Fırın Ekranı</h2>
+<div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+    <h2 class="text-warning fw-bold m-0">🍳 Sızır Mutfak & Fırın Ekranı</h2>
+    <button class="btn btn-outline-danger btn-lg fw-bold" onclick="cleanCompletedFromScreen()">
+        🧹 Ekranı Temizle (Tamamlananları Gizle)
+    </button>
+</div>
+
 <div class="row g-4" id="orders-container"></div>
 
 <script>
@@ -46,11 +52,22 @@
         renderAllCards();
     });
 
+    function cleanCompletedFromScreen() {
+        // Sadece mutfak tarafından tamamlanan kartları yerel listeden kaldırır (Veritabanına dokunmaz)
+        allOrders = allOrders.filter(o => o.status !== 'mutfak_tamam');
+        renderAllCards();
+    }
+
     function renderAllCards() {
         const container = document.getElementById('orders-container');
         container.innerHTML = '';
 
-        // Sıralama Mantığı: Aktifler en üstte, Tamamlanan kararmışlar en altta kalacak şekilde tarih sırası
+        if (allOrders.length === 0) {
+            container.innerHTML = '<div class="col-12 text-center text-secondary my-5 fs-4">Ekranda bekleyen aktif sipariş bulunmuyor.</div>';
+            return;
+        }
+
+        // Sıralama Mantığı: Aktifler en üstte, Tamamlanan kararmışlar en altta
         let sorted = [...allOrders].sort((a, b) => {
             if (a.status === 'mutfak_tamam' && b.status !== 'mutfak_tamam') return 1;
             if (a.status !== 'mutfak_tamam' && b.status === 'mutfak_tamam') return -1;
