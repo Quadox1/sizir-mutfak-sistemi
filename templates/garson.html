@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sızır Alabalık — Garson Hesabı Girişi</title>
+    <title>Sızır Alabalık — Garson Hesabı</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
@@ -13,48 +13,41 @@
         .qty-btn { width: 44px; height: 44px; font-weight: bold; font-size: 1.3rem; border-radius: 8px; }
         .basket-bar { position: fixed; bottom: 0; left: 0; right: 0; background-color: #181825; border-top: 2px solid #89b4fa; padding: 12px 16px; z-index: 1000; }
         .item-row { background-color: #2a2a3c; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; border: 1px solid #45475a; }
-        .order-badge { background-color: #313244; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; }
+        .order-badge { background-color: #2a2a3c; border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid #45475a; }
+        .item-text { color: #ffffff !important; font-weight: 600; font-size: 1rem; }
     </style>
 </head>
 <body class="pb-5 mb-5">
 
-<!-- GARSON ŞİFRELİ HESAP GİRİŞ MODALI -->
+<!-- GİRİŞ EKRANI -->
 <div id="login-screen" class="position-fixed top-0 start-0 w-100 h-100 bg-dark d-flex align-items-center justify-content-center p-3" style="z-index: 2000;">
     <div class="card card-dark p-4 w-100" style="max-width: 380px;">
         <h3 class="text-center text-accent fw-bold mb-2">🐟 Sızır Alabalık</h3>
-        <p class="text-secondary text-center small mb-4">Garson Hesabınızla Giriş Yapın</p>
-        
+        <p class="text-secondary text-center small mb-4">Garson Girişi</p>
         <div id="login-error" class="alert alert-danger py-2 small d-none text-center"></div>
-
         <div class="mb-3">
             <label class="form-label text-secondary small fw-bold">Kullanıcı Adı</label>
-            <input type="text" id="input-username" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="Örn: ahmet" autocomplete="off">
+            <input type="text" id="input-username" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="Örn: ahmet">
         </div>
-
         <div class="mb-4">
             <label class="form-label text-secondary small fw-bold">Şifre</label>
             <input type="password" id="input-password" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="••••">
         </div>
-
         <button type="button" id="btn-login-action" class="btn btn-primary btn-lg w-100 fw-bold">Giriş Yap</button>
     </div>
 </div>
 
-<!-- ANA GARSON ARAYÜZÜ -->
+<!-- MAIN EKRAN -->
 <div class="container py-3" id="app-content" style="display: none;">
     <div class="d-flex justify-content-between align-items-center mb-3 card-dark p-3">
         <div>
-            <span class="text-secondary small d-block">Aktif Garson Hesabı</span>
+            <span class="text-secondary small d-block">Garson</span>
             <h4 class="text-warning fw-bold m-0" id="garson-title">---</h4>
         </div>
         <button type="button" class="btn btn-outline-danger btn-sm" id="btn-logout">Çıkış Yap</button>
     </div>
 
-    <div class="card card-dark p-3 mb-3">
-        <h6 class="text-accent fw-bold mb-2">📊 Bugün Toplam Siparişiniz: <span id="stat-total-orders" class="text-warning fs-5">0</span></h6>
-        <div id="stat-items-breakdown" class="d-flex flex-wrap gap-2 mt-2"></div>
-    </div>
-
+    <!-- Menü -->
     <div class="card card-dark p-3 mb-3">
         <h5 class="text-warning fw-bold mb-3">🍽️ Menü</h5>
         {% for item in menu %}
@@ -69,6 +62,7 @@
         {% endfor %}
     </div>
 
+    <!-- Mutfaktaki Siparişleriniz (Yazıları Netleştirildi) -->
     <div class="card card-dark p-3 mb-5">
         <h5 class="text-info fw-bold mb-3">⏳ Mutfaktaki Siparişleriniz</h5>
         <div id="my-orders-list">
@@ -90,36 +84,17 @@
     let basket = {};
     let myOrders = [];
     const socket = io();
+    const readyAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 
     document.addEventListener("DOMContentLoaded", function() {
-        // Buton dinleyicilerini güvenli şekilde bağla (Inline onclick engeline takılmaması için)
         document.getElementById('btn-login-action').addEventListener('click', loginGarson);
         document.getElementById('btn-logout').addEventListener('click', logoutGarson);
-
-        document.getElementById('input-password').addEventListener('keyup', function(e) {
-            if (e.key === 'Enter') loginGarson();
-        });
-
-        if (activeGarson) {
-            initGarsonSession();
-        }
+        if (activeGarson) initGarsonSession();
     });
 
     function loginGarson() {
         const usernameVal = document.getElementById('input-username').value.trim();
         const passwordVal = document.getElementById('input-password').value.trim();
-        const errDiv = document.getElementById('login-error');
-        const loginBtn = document.getElementById('btn-login-action');
-
-        if (!usernameVal || !passwordVal) {
-            errDiv.innerText = "Lütfen kullanıcı adı ve şifrenizi girin!";
-            errDiv.classList.remove('d-none');
-            return;
-        }
-
-        loginBtn.disabled = true;
-        loginBtn.innerText = "Giriş Yapılıyor...";
-
         fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -127,24 +102,13 @@
         })
         .then(res => res.json())
         .then(data => {
-            loginBtn.disabled = false;
-            loginBtn.innerText = "Giriş Yap";
-
             if (data.status === 'success') {
-                errDiv.classList.add('d-none');
                 activeGarson = data.garson_name;
                 localStorage.setItem('sizir_garson_name', activeGarson);
                 initGarsonSession();
             } else {
-                errDiv.innerText = data.message || "Giriş Başarısız!";
-                errDiv.classList.remove('d-none');
+                alert(data.message);
             }
-        })
-        .catch(err => {
-            loginBtn.disabled = false;
-            loginBtn.innerText = "Giriş Yap";
-            errDiv.innerText = "Sunucu hatası!";
-            errDiv.classList.remove('d-none');
         });
     }
 
@@ -176,50 +140,42 @@
         for (let [name, qty] of Object.entries(basket)) {
             itemsPayload.push({ name: name, qty: qty });
         }
-
         fetch('/api/siparis-ver', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ garson: activeGarson, items: itemsPayload })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                basket = {};
-                document.querySelectorAll('[id^="qty-"]').forEach(el => el.innerText = '0');
-                document.getElementById('lbl-total-items').innerText = '0 Ürün';
-                document.getElementById('btn-submit').disabled = true;
-            }
+        }).then(() => {
+            basket = {};
+            document.querySelectorAll('[id^="qty-"]').forEach(el => el.innerText = '0');
+            document.getElementById('lbl-total-items').innerText = '0 Ürün';
+            document.getElementById('btn-submit').disabled = true;
         });
     }
 
     socket.on('tum_siparisler', (orders) => {
         myOrders = orders.filter(o => o.garson === activeGarson);
         renderMyOrders();
-        updateStats();
     });
 
     socket.on('yeni_siparis', (order) => {
         if (order.garson === activeGarson) {
             myOrders.push(order);
             renderMyOrders();
-            updateStats();
         }
     });
 
     socket.on('siparis_guncellendi', (order) => {
         if (order.garson === activeGarson) {
+            try { readyAudio.play(); } catch(e){}
             let idx = myOrders.findIndex(o => o.order_id === order.order_id);
             if (idx !== -1) myOrders[idx] = order;
             renderMyOrders();
-            updateStats();
         }
     });
 
     socket.on('siparis_silindi', (data) => {
         myOrders = myOrders.filter(o => o.order_id !== data.order_id);
         renderMyOrders();
-        updateStats();
     });
 
     function renderMyOrders() {
@@ -231,40 +187,24 @@
 
         container.innerHTML = myOrders.map(o => {
             let itemsHtml = o.items.map(i => `
-                <div class="d-flex justify-content-between border-bottom border-secondary py-1 small">
-                    <span>${i.qty}x ${i.name}</span>
-                    <span class="${i.status === 'hazir' ? 'text-success fw-bold' : 'text-warning'}">
-                        ${i.status === 'hazir' ? '✅ Hazır' : '⏳ Hazırlanıyor'}
+                <div class="d-flex justify-content-between border-bottom border-secondary py-2">
+                    <span class="item-text">${i.qty}x ${i.name}</span>
+                    <span class="${i.status === 'hazir' ? 'text-success fw-bold' : 'text-warning fw-bold'}">
+                        ${i.status === 'hazir' ? '✅ HAZIR' : '⏳ Hazırlanıyor'}
                     </span>
                 </div>
             `).join('');
 
             return `
-                <div class="order-badge mb-2">
-                    <div class="d-flex justify-content-between fw-bold text-accent mb-1">
+                <div class="order-badge">
+                    <div class="d-flex justify-content-between fw-bold text-warning mb-2">
                         <span>Sipariş #${o.order_id}</span>
-                        <span class="text-secondary">${o.time}</span>
+                        <span class="text-light">${o.time}</span>
                     </div>
                     ${itemsHtml}
                 </div>
             `;
         }).join('');
-    }
-
-    function updateStats() {
-        document.getElementById('stat-total-orders').innerText = myOrders.length;
-        
-        let itemCounts = {};
-        myOrders.forEach(o => {
-            o.items.forEach(i => {
-                itemCounts[i.name] = (itemCounts[i.name] || 0) + i.qty;
-            });
-        });
-
-        const breakdownContainer = document.getElementById('stat-items-breakdown');
-        breakdownContainer.innerHTML = Object.entries(itemCounts).map(([name, count]) => `
-            <span class="badge bg-secondary p-2 fs-6">${name}: <strong class="text-warning">${count} Adet</strong></span>
-        `).join('');
     }
 </script>
 </body>
