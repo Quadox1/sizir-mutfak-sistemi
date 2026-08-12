@@ -40,6 +40,9 @@ def init_db():
     ''')
     cursor.execute("INSERT OR IGNORE INTO admin_config (key, value) VALUES ('admin_pass', 'admin123')")
     
+    # ADMIN ŞİFRESİNİ ZORLA 'admin123' OLARAK SIFIRLAMA
+    cursor.execute("UPDATE admin_config SET value = 'admin123' WHERE key = 'admin_pass'")
+    
     default_users = [
         ('ahmet', 'Ahmet', '1234'),
         ('mehmet', 'Mehmet', '1234'),
@@ -130,7 +133,6 @@ def siparis_ver():
     order_id = str(int(last_order['order_id']) + 1) if last_order else "101"
     now_str = datetime.now().strftime("%H:%M")
 
-    # Ürünleri standart menü sırasına göre sırala
     sorted_items = sorted(items, key=lambda x: MENU_ITEMS.index(x['name']) if x['name'] in MENU_ITEMS else 99)
 
     order_items = []
@@ -175,7 +177,6 @@ def item_durum_degistir():
             if item['status'] != "hazir":
                 all_ready = False
 
-        # Eğer TÜM ÜRÜNLER tamamlandıysa siparişi otomatik olarak 'mutfak_tamam' durumuna geçir
         new_status = "mutfak_tamam" if all_ready else "aktif"
 
         conn.execute("UPDATE orders SET items_json = ?, status = ? WHERE order_id = ?", 
@@ -196,7 +197,6 @@ def item_durum_degistir():
     conn.close()
     return jsonify({"status": "error"}), 404
 
-# GARSON TESLİM ALDI -> OTOMATİK OLARAK TAMAMLANIR (KARARIR)
 @app.route('/api/garson-teslim-aldi', methods=['POST'])
 def garson_teslim_aldi():
     data = request.get_json(silent=True) or {}
@@ -222,7 +222,6 @@ def garson_teslim_aldi():
     conn.close()
     return jsonify({"status": "error"}), 404
 
-# MUTFAKTAN SİPARİŞİ SİLME API'Sİ
 @app.route('/api/siparis-sil', methods=['POST'])
 def siparis_sil():
     data = request.get_json(silent=True) or {}
@@ -260,7 +259,6 @@ def siparis_geri_al():
     conn.close()
     return jsonify({"status": "error"}), 404
 
-# YÖNETİCİ PANELİ API'LERİ
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def admin_users():
     if not session.get('admin_logged_in'):
