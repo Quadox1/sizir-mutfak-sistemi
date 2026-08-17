@@ -38,11 +38,10 @@ def init_db():
             status TEXT NOT NULL
         )
     ''')
+    # Sadece ilk kurulumda varsayılan şifreyi ekle (Üzerine yazmaz)
     cursor.execute("INSERT OR IGNORE INTO admin_config (key, value) VALUES ('admin_pass', 'admin123')")
     
-    # ADMIN ŞİFRESİNİ ZORLA 'admin123' OLARAK SIFIRLAMA
-    cursor.execute("UPDATE admin_config SET value = 'admin123' WHERE key = 'admin_pass'")
-    
+    # Sadece ilk kurulumda varsayılan garsonları ekle
     default_users = [
         ('ahmet', 'Ahmet', '1234'),
         ('mehmet', 'Mehmet', '1234'),
@@ -141,7 +140,8 @@ def siparis_ver():
             "id": f"{order_id}_{len(order_items)}",
             "name": item['name'],
             "qty": item['qty'],
-            "status": "hazirlaniyor"
+            "mutfak_status": "hazirlaniyor",  # hazirlaniyor / hazir
+            "garson_status": "bekliyor"       # bekliyor / alindi
         })
 
     order_data = {
@@ -160,8 +160,9 @@ def siparis_ver():
     socketio.emit('yeni_siparis', order_data)
     return jsonify({"status": "success", "order_id": order_id})
 
-@app.route('/api/item-durum-degistir', methods=['POST'])
-def item_durum_degistir():
+# MUTFAK ÜRÜN DURUMU DEĞİŞTİRME (HAZIR / HAZIRLANIYOR)
+@app.route('/api/mutfak/item-durum', methods=['POST'])
+def mutfak_item_durum():
     data = request.get_json(silent=True) or {}
     order_id = str(data.get('order_id'))
     item_id = data.get('item_id')
@@ -170,14 +171,50 @@ def item_durum_degistir():
     row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
     if row:
         items = json.loads(row['items_json'])
-        all_ready = True
         for item in items:
             if item['id'] == item_id:
-                item['status'] = "hazir" if item['status'] == "hazirlaniyor" else "hazirlaniyor"
-            if item['status'] != "hazir":
-                all_ready = False
+                # Eski kayıtlarda mutfak_status yoksa status'ten al
+                curr = item.get('mutfak_status', item.get('status', 'hazirlaniyor'))
+                item['mutfak_status'] = 'hazir' if curr == 'hazirlaniyor' else 'hazirlaniyor'
 
-        new_status = "mutfak_tamam" if all_ready else "aktif"
+        conn.execute("UPDATE orders SET items_json = ? WHERE order_id = ?", (json.dumps(items), order_id))
+        conn.commit()
+
+        updated_order = {
+            "order_id": order_id,
+            "garson": row['garson'],
+            "time": row['time_str'],
+            "items": items,
+            "status": row['status']
+        }
+        conn.close()
+        socketio.emit('siparis_guncellendi', updated_order)
+        return jsonify({"status": "success"})
+
+    conn.close()
+    return jsonify({"status": "error"}), 404
+
+# GARSON TEK TEK ÜRÜN TESLİM ALMA / İŞARETLEME
+@app.route('/api/garson/item-teslim', methods=['POST'])
+def garson_item_teslim():
+    data = request.get_json(silent=True) or {}
+    order_id = str(data.get('order_id'))
+    item_id = data.get('item_id')
+
+    conn = get_db()
+    row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
+    if row:
+        items = json.loads(row['items_json'])
+        all_garson_done = True
+        for item in items:
+            if item['id'] == item_id:
+                curr = item.get('garson_status', 'bekliyor')
+                item['garson_status'] = 'alindi' if curr == 'bekliyor' else 'bekliyor'
+            
+            if item.get('garson_status') != 'alindi':
+                all_garson_done = False
+
+        new_status = 'mutfak_tamam' if all_garson_done else 'aktif'
 
         conn.execute("UPDATE orders SET items_json = ?, status = ? WHERE order_id = ?", 
                      (json.dumps(items), new_status, order_id))
@@ -197,31 +234,7 @@ def item_durum_degistir():
     conn.close()
     return jsonify({"status": "error"}), 404
 
-@app.route('/api/garson-teslim-aldi', methods=['POST'])
-def garson_teslim_aldi():
-    data = request.get_json(silent=True) or {}
-    order_id = str(data.get('order_id'))
-    conn = get_db()
-    
-    row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
-    if row:
-        conn.execute("UPDATE orders SET status = 'mutfak_tamam' WHERE order_id = ?", (order_id,))
-        conn.commit()
-        
-        updated_order = {
-            "order_id": order_id,
-            "garson": row['garson'],
-            "time": row['time_str'],
-            "items": json.loads(row['items_json']),
-            "status": "mutfak_tamam"
-        }
-        conn.close()
-        socketio.emit('siparis_guncellendi', updated_order)
-        return jsonify({"status": "success"})
-
-    conn.close()
-    return jsonify({"status": "error"}), 404
-
+# SİPARİŞ SİLME
 @app.route('/api/siparis-sil', methods=['POST'])
 def siparis_sil():
     data = request.get_json(silent=True) or {}
@@ -234,6 +247,7 @@ def siparis_sil():
     socketio.emit('siparis_silindi', {"order_id": order_id})
     return jsonify({"status": "success"})
 
+# GERİ ALMA
 @app.route('/api/siparis-geri-al', methods=['POST'])
 def siparis_geri_al():
     data = request.get_json(silent=True) or {}
@@ -242,14 +256,20 @@ def siparis_geri_al():
     conn = get_db()
     row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
     if row:
-        conn.execute("UPDATE orders SET status = 'aktif' WHERE order_id = ?", (order_id,))
+        items = json.loads(row['items_json'])
+        # Tüm ürünlerin garson teslim durumunu sıfırla
+        for item in items:
+            item['garson_status'] = 'bekliyor'
+
+        conn.execute("UPDATE orders SET status = 'aktif', items_json = ? WHERE order_id = ?", 
+                     (json.dumps(items), order_id))
         conn.commit()
         
         updated_order = {
             "order_id": order_id,
             "garson": row['garson'],
             "time": row['time_str'],
-            "items": json.loads(row['items_json']),
+            "items": items,
             "status": "aktif"
         }
         conn.close()
@@ -259,6 +279,7 @@ def siparis_geri_al():
     conn.close()
     return jsonify({"status": "error"}), 404
 
+# YÖNETİCİ PANELİ API'LERİ
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def admin_users():
     if not session.get('admin_logged_in'):
@@ -272,7 +293,9 @@ def admin_users():
 
     if request.method == 'POST':
         data = request.json
-        u, n, p = data.get('username', '').strip().lower(), data.get('name', '').strip(), data.get('password', '').strip()
+        u = data.get('username', '').strip().lower()
+        n = data.get('name', '').strip()
+        p = data.get('password', '').strip()
         conn.execute("INSERT OR REPLACE INTO users (username, name, password) VALUES (?, ?, ?)", (u, n, p))
         conn.commit()
         conn.close()
