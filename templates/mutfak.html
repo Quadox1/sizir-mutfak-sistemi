@@ -11,7 +11,7 @@
         .order-card { background-color: #1e1e2e; border: 3px solid #313244; border-radius: 16px; transition: all 0.3s ease; position: relative; }
         .order-card.ready-all { border-color: #a6e3a1 !important; box-shadow: 0 0 15px rgba(166, 227, 161, 0.2); }
         .order-card.muted-completed { opacity: 0.35; border-color: #45475a !important; background-color: #181825 !important; filter: grayscale(80%); }
-        .item-btn { text-align: left; font-size: 1.4rem !important; font-weight: 700 !important; padding: 14px 18px; border-radius: 12px; }
+        .item-btn { text-align: left; font-size: 1.35rem !important; font-weight: 700 !important; padding: 14px 18px; border-radius: 12px; }
         .item-btn.hazirlaniyor { background-color: #2a2a3c; color: #ffffff; border: 2px solid #45475a; }
         .item-btn.hazir { background-color: #1e3a2b; color: #a6e3a1; text-decoration: line-through; border: 2px solid #a6e3a1; }
         .badge-garson-lg { font-size: 1.2rem !important; font-weight: 800 !important; padding: 6px 12px; background-color: #89b4fa; color: #11111b; border-radius: 8px; }
@@ -81,7 +81,6 @@
             return;
         }
 
-        // Aktif siparişler üstte, Kararmış tamamlananlar altta olacak şekilde sırala
         let sorted = [...allOrders].sort((a, b) => {
             if (a.status === 'mutfak_tamam' && b.status !== 'mutfak_tamam') return 1;
             if (a.status !== 'mutfak_tamam' && b.status === 'mutfak_tamam') return -1;
@@ -100,21 +99,28 @@
 
         let isCompleted = (order.status === 'mutfak_tamam');
 
-        // Ürünleri standart menü sırasına göre sırala
         let sortedItems = [...order.items].sort((a, b) => {
             let idxA = MENU_ORDER.indexOf(a.name);
             let idxB = MENU_ORDER.indexOf(b.name);
             return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
         });
 
-        let itemsHtml = sortedItems.map(item => `
-            <button class="btn w-100 item-btn mb-2 d-flex justify-content-between align-items-center ${item.status}" 
-                    ${isCompleted ? 'disabled' : ''}
-                    onclick="toggleItemStatus('${order.order_id}', '${item.id}')">
-                <span><strong class="text-warning me-2 fs-3">${item.qty}x</strong> ${item.name}</span>
-                <span class="fs-3">${item.status === 'hazir' ? '✅' : '⏳'}</span>
-            </button>
-        `).join('');
+        let itemsHtml = sortedItems.map(item => {
+            let mStatus = item.mutfak_status || item.status || 'hazirlaniyor';
+            let isGarsonTook = (item.garson_status === 'alindi');
+
+            return `
+                <button class="btn w-100 item-btn mb-2 d-flex justify-content-between align-items-center ${mStatus}" 
+                        ${isCompleted ? 'disabled' : ''}
+                        onclick="toggleItemStatus('${order.order_id}', '${item.id}')">
+                    <span>
+                        <strong class="text-warning me-2 fs-3">${item.qty}x</strong> ${item.name}
+                        ${isGarsonTook ? '<span class="badge bg-warning text-dark fs-6 ms-2">🏃 Garson Aldı</span>' : ''}
+                    </span>
+                    <span class="fs-3">${mStatus === 'hazir' ? '✅' : '⏳'}</span>
+                </button>
+            `;
+        }).join('');
 
         col.innerHTML = `
             <div class="order-card p-3 ${isCompleted ? 'muted-completed' : ''}">
@@ -141,7 +147,7 @@
     }
 
     function toggleItemStatus(orderId, itemId) {
-        fetch('/api/item-durum-degistir', {
+        fetch('/api/mutfak/item-durum', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order_id: orderId, item_id: itemId })
