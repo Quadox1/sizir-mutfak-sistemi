@@ -7,25 +7,147 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        body { background-color: #12121e; color: #ffffff; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        .order-card { background-color: #1e1e2e; border: 3px solid #313244; border-radius: 16px; transition: all 0.3s ease; position: relative; }
-        .order-card.ready-all { border-color: #a6e3a1 !important; box-shadow: 0 0 15px rgba(166, 227, 161, 0.2); }
-        .order-card.muted-completed { opacity: 0.35; border-color: #45475a !important; background-color: #181825 !important; filter: grayscale(80%); }
-        .item-btn { text-align: left; font-size: 1.35rem !important; font-weight: 700 !important; padding: 14px 18px; border-radius: 12px; }
-        .item-btn.hazirlaniyor { background-color: #2a2a3c; color: #ffffff; border: 2px solid #45475a; }
-        .item-btn.hazir { background-color: #1e3a2b; color: #a6e3a1; text-decoration: line-through; border: 2px solid #a6e3a1; }
-        .badge-garson-lg { font-size: 1.2rem !important; font-weight: 800 !important; padding: 6px 12px; background-color: #89b4fa; color: #11111b; border-radius: 8px; }
+        /* === KOYU TEMA (VARSAYILAN) === */
+        body { 
+            background-color: #12121e; 
+            color: #ffffff; 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            transition: background-color 0.3s ease, color 0.3s ease; 
+        }
+        .header-title { color: #f9e2af; }
+        .order-card { 
+            background-color: #1e1e2e; 
+            border: 3px solid #313244; 
+            border-radius: 16px; 
+            transition: all 0.2s ease; 
+            position: relative; 
+        }
+        .order-card.ready-all { 
+            border-color: #a6e3a1 !important; 
+            box-shadow: 0 0 15px rgba(166, 227, 161, 0.25); 
+        }
+        .order-card.muted-completed { 
+            opacity: 0.4; 
+            border-color: #45475a !important; 
+            background-color: #181825 !important; 
+            filter: grayscale(70%); 
+        }
+
+        .item-btn { 
+            width: 100%;
+            text-align: left; 
+            font-size: 1.35rem !important; 
+            font-weight: 700 !important; 
+            padding: 14px 18px; 
+            border-radius: 12px; 
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 2px solid #45475a;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .item-btn.hazirlaniyor { 
+            background-color: #2a2a3c !important; 
+            color: #ffffff !important; 
+            border-color: #585b70 !important; 
+        }
+        .item-btn.hazirlaniyor .item-title { color: #ffffff !important; }
+
+        .item-btn.hazir { 
+            background-color: #1c3326 !important; 
+            color: #a6e3a1 !important; 
+            border-color: #a6e3a1 !important; 
+        }
+        .item-btn.hazir .item-title { 
+            color: #a6e3a1 !important; 
+            text-decoration: line-through; 
+        }
+
+        .badge-garson-lg { 
+            font-size: 1.2rem !important; 
+            font-weight: 800 !important; 
+            padding: 6px 14px; 
+            background-color: #89b4fa; 
+            color: #11111b; 
+            border-radius: 8px; 
+        }
         .order-no-lg { font-size: 2.2rem !important; font-weight: 900; color: #f9e2af; }
-        .btn-delete-card { position: absolute; top: -12px; left: -12px; width: 34px; height: 34px; border-radius: 50%; padding: 0; font-weight: bold; z-index: 10; }
+        .btn-delete-card { 
+            position: absolute; 
+            top: -12px; 
+            left: -12px; 
+            width: 34px; 
+            height: 34px; 
+            border-radius: 50%; 
+            padding: 0; 
+            font-weight: bold; 
+            z-index: 10; 
+            font-size: 1.1rem; 
+            line-height: 1; 
+        }
+
+        /* === AÇIK TEMA STİLLERİ === */
+        body.light-theme {
+            background-color: #e9ecef;
+            color: #212529;
+        }
+        body.light-theme .header-title { color: #d97706; }
+        body.light-theme .order-card {
+            background-color: #ffffff;
+            border: 3px solid #ced4da;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        body.light-theme .order-card.ready-all {
+            border-color: #2b8a3e !important;
+            box-shadow: 0 0 16px rgba(43, 138, 62, 0.3);
+        }
+        body.light-theme .order-card.muted-completed {
+            background-color: #dee2e6 !important;
+            border-color: #adb5bd !important;
+            opacity: 0.5;
+        }
+        body.light-theme .order-no-lg { color: #d97706; }
+        body.light-theme .badge-garson-lg {
+            background-color: #1d4ed8;
+            color: #ffffff;
+        }
+        body.light-theme .item-btn.hazirlaniyor {
+            background-color: #f1f3f5 !important;
+            color: #212529 !important;
+            border-color: #ced4da !important;
+        }
+        body.light-theme .item-btn.hazirlaniyor .item-title {
+            color: #212529 !important;
+        }
+        body.light-theme .item-btn.hazir {
+            background-color: #d3f9d8 !important;
+            color: #2b8a3e !important;
+            border-color: #2b8a3e !important;
+        }
+        body.light-theme .item-btn.hazir .item-title {
+            color: #2b8a3e !important;
+            text-decoration: line-through;
+        }
+        body.light-theme .border-secondary {
+            border-color: #ced4da !important;
+        }
     </style>
 </head>
 <body class="p-3">
 
-<div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
-    <h2 class="text-warning fw-bold m-0">🍳 Sızır Mutfak & Fırın Ekranı</h2>
-    <button class="btn btn-danger btn-lg fs-5 fw-bold px-4" onclick="clearAllScreen()">
-        🧹 Ekranı Komple Temizle
-    </button>
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3 gap-2">
+    <h2 class="header-title fw-bold m-0">🍳 Sızır Mutfak & Fırın Ekranı</h2>
+    <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-outline-warning btn-lg fs-6 fw-bold px-3" id="btn-theme-toggle" onclick="toggleTheme()">
+            ☀️ Açık Tema
+        </button>
+        <button type="button" class="btn btn-danger btn-lg fs-5 fw-bold px-4" onclick="clearAllScreen()">
+            🧹 Ekranı Komple Temizle
+        </button>
+    </div>
 </div>
 
 <div class="row g-4" id="orders-container"></div>
@@ -43,6 +165,35 @@
         "Kaşarlı Balık",
         "Köz Tabağı"
     ];
+
+    // TEMA YÖNETİMİ
+    function initTheme() {
+        const savedTheme = localStorage.getItem('sizir_theme') || 'dark';
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-theme');
+            document.getElementById('btn-theme-toggle').innerHTML = '🌙 Koyu Tema';
+            document.getElementById('btn-theme-toggle').className = 'btn btn-outline-dark btn-lg fs-6 fw-bold px-3';
+        } else {
+            document.body.classList.remove('light-theme');
+            document.getElementById('btn-theme-toggle').innerHTML = '☀️ Açık Tema';
+            document.getElementById('btn-theme-toggle').className = 'btn btn-outline-warning btn-lg fs-6 fw-bold px-3';
+        }
+    }
+
+    function toggleTheme() {
+        const isLight = document.body.classList.toggle('light-theme');
+        if (isLight) {
+            localStorage.setItem('sizir_theme', 'light');
+            document.getElementById('btn-theme-toggle').innerHTML = '🌙 Koyu Tema';
+            document.getElementById('btn-theme-toggle').className = 'btn btn-outline-dark btn-lg fs-6 fw-bold px-3';
+        } else {
+            localStorage.setItem('sizir_theme', 'dark');
+            document.getElementById('btn-theme-toggle').innerHTML = '☀️ Açık Tema';
+            document.getElementById('btn-theme-toggle').className = 'btn btn-outline-warning btn-lg fs-6 fw-bold px-3';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initTheme);
 
     socket.on('tum_siparisler', (orders) => {
         allOrders = orders;
@@ -110,11 +261,12 @@
             let isGarsonTook = (item.garson_status === 'alindi');
 
             return `
-                <button class="btn w-100 item-btn mb-2 d-flex justify-content-between align-items-center ${mStatus}" 
+                <button type="button" class="btn item-btn ${mStatus}" 
                         ${isCompleted ? 'disabled' : ''}
                         onclick="toggleItemStatus('${order.order_id}', '${item.id}')">
                     <span>
-                        <strong class="text-warning me-2 fs-3">${item.qty}x</strong> ${item.name}
+                        <strong class="text-warning me-2 fs-3">${item.qty}x</strong> 
+                        <span class="item-title">${item.name}</span>
                         ${isGarsonTook ? '<span class="badge bg-warning text-dark fs-6 ms-2">🏃 Garson Aldı</span>' : ''}
                     </span>
                     <span class="fs-3">${mStatus === 'hazir' ? '✅' : '⏳'}</span>
@@ -124,7 +276,7 @@
 
         col.innerHTML = `
             <div class="order-card p-3 ${isCompleted ? 'muted-completed' : ''}">
-                <button class="btn btn-danger btn-delete-card" onclick="deleteOrderCard('${order.order_id}')" title="Siparişi Sil">✕</button>
+                <button type="button" class="btn btn-danger btn-delete-card" onclick="deleteOrderCard('${order.order_id}')" title="Siparişi Sil">✕</button>
 
                 <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
                     <span class="order-no-lg">#${order.order_id}</span>
@@ -137,7 +289,7 @@
                 ${itemsHtml}
 
                 ${isCompleted ? `
-                    <button class="btn btn-outline-warning btn-sm w-100 mt-2 fw-bold" onclick="siparisGeriAl('${order.order_id}')">
+                    <button type="button" class="btn btn-outline-warning btn-sm w-100 mt-2 fw-bold" onclick="siparisGeriAl('${order.order_id}')">
                         ↩️ Geri Al (Aktif Yap)
                     </button>
                 ` : ''}
